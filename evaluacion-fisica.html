@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Evaluación Física Funcional</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:monospace;min-height:100vh;transition:background 0.3s,color 0.3s}
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+input[type=number]{-moz-appearance:textfield}
+.serif{font-family:'Playfair Display',Georgia,serif}
+button{cursor:pointer;font-family:monospace;border:none;transition:all 0.15s}
+button:hover{opacity:0.85}
+input{font-family:monospace;outline:none;transition:all 0.15s}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.flex{display:flex;gap:10px}
+.bar{height:5px;border-radius:3px;transition:background 0.3s}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ─── THEMES ──────────────────────────────────────────────────────────────────
+const THEMES={
+  dark:{bg:"#0c0c10",bgCard:"#10100e",bgInput:"#0a0a0f",border:"#2a2820",borderCard:"#1a1812",text:"#e8e4dc",textDim:"#6a6050",textMuted:"#3a3828",accent:"#c8a45a",accentBg:"#c8a45a18",accentBorder:"#c8a45a40",btnPrimary:"#c8a45a",btnPrimaryText:"#0c0c10",btnSecondary:"#1a1812",btnSecondaryText:"#6a6050",gradient:"linear-gradient(135deg,#1a1810,#0c0c10)",tagBg:"#1a1812"},
+  slate:{bg:"#151c2c",bgCard:"#1e2535",bgInput:"#111827",border:"#2d3748",borderCard:"#253044",text:"#e2e8f0",textDim:"#718096",textMuted:"#4a5568",accent:"#3dd6a3",accentBg:"#3dd6a318",accentBorder:"#3dd6a340",btnPrimary:"#3dd6a3",btnPrimaryText:"#111827",btnSecondary:"#253044",btnSecondaryText:"#718096",gradient:"linear-gradient(135deg,#253044,#151c2c)",tagBg:"#253044"},
+  light:{bg:"#f5f2ee",bgCard:"#ffffff",bgInput:"#ede9e0",border:"#ddd9d0",borderCard:"#e8e4dc",text:"#1a1a1a",textDim:"#6a6050",textMuted:"#b0a898",accent:"#4a7c6f",accentBg:"#4a7c6f18",accentBorder:"#4a7c6f40",btnPrimary:"#4a7c6f",btnPrimaryText:"#ffffff",btnSecondary:"#e8e4dc",btnSecondaryText:"#6a6050",gradient:"linear-gradient(135deg,#ede9e0,#f5f2ee)",tagBg:"#ede9e0"},
+};
+
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const AGE_BANDS=[
+  {id:"u35",label:"18–35",desc:"Joven",color:"#5ab87a"},
+  {id:"36_50",label:"36–50",desc:"Adulto",color:"#c8a45a"},
+  {id:"51_65",label:"51–65",desc:"Maduro",color:"#e8a05a"},
+  {id:"66_75",label:"66–75",desc:"Senior",color:"#8ab4d4"},
+  {id:"over75",label:">75",desc:"Gran Senior",color:"#b48ad4"},
+];
+const HEALTH_IMPACT={
+  grip:{icon:"❤️",text:"Predice mortalidad cardiovascular con más precisión que la tensión arterial. Cada −5 kg aumenta el riesgo cardiovascular un 17%.",source:"Lancet PURE, 2015 · n=139.691"},
+  chair:{icon:"🦴",text:"Predictor directo de caídas, sarcopenia y pérdida de independencia funcional.",source:"Rikli & Jones, 1999/2013 · n=7.183"},
+  pushups:{icon:"🫀",text:"Capacidad de 40+ flexiones asociada a 96% menos eventos cardiovasculares en 10 años.",source:"JAMA Network Open, 2019 · n=1.104 · Harvard"},
+  balance:{icon:"⚡",text:"No aguantar 10 seg en una pierna dobla el riesgo de muerte a 7 años.",source:"BJSM, 2022 · n=1.702"},
+  srt:{icon:"🧬",text:"Cada punto menos equivale a 21% mayor riesgo de mortalidad por todas las causas.",source:"Eur J Prev Cardiol, 2014 · n=6.396"},
+  cooper:{icon:"🫁",text:"Cada MET adicional de VO2max reduce mortalidad cardiovascular un 9–13%.",source:"European Heart Journal, 2018 · n=100.000+"},
+  deadhang:{icon:"💪",text:"Indicador de salud del hombro, densidad ósea y resistencia de agarre bajo carga.",source:"Referencia orientativa — Attia, 2023"},
+};
+const TABLES={
+  grip:{u35:{m:[34,40,48,56],f:[21,25,30,36]},"36_50":{m:[33,39,46,53],f:[20,24,29,35]},"51_65":{m:[28,34,41,48],f:[17,21,26,31]},"66_75":{m:[22,28,35,42],f:[13,17,22,27]},over75:{m:[16,22,28,35],f:[9,13,18,23]}},
+  chair:{u35:{m:[17,20,25,30],f:[15,18,22,27]},"36_50":{m:[15,18,22,27],f:[13,16,20,25]},"51_65":{m:[13,16,20,24],f:[11,13,17,21]},"66_75":{m:[10,12,15,18],f:[9,11,13,16]},over75:{m:[8,10,12,15],f:[7,9,11,13]}},
+  pushups:{u35:{m:[14,18,28,40],f:[9,12,20,30]},"36_50":{m:[10,14,22,34],f:[6,9,14,22]},"51_65":{m:[7,10,17,26],f:[4,6,10,17]},"66_75":{m:[4,6,12,19],f:[2,4,7,13]},over75:{m:[2,4,8,14],f:[1,2,5,9]}},
+  pushups_knees:{u35:{m:[8,12,18,26],f:[10,15,22,32]},"36_50":{m:[6,9,14,20],f:[8,12,17,25]},"51_65":{m:[4,7,11,16],f:[6,9,13,19]},"66_75":{m:[2,4,7,12],f:[4,6,10,15]},over75:{m:[1,3,5,9],f:[2,4,7,11]}},
+  balance_oa:{u35:[18,25,38,52],"36_50":[14,20,30,44],"51_65":[10,15,24,36],"66_75":[6,10,16,24],over75:[3,6,11,18]},
+  balance_oc_m:{u35:[10,15,22,32],"36_50":[7,11,18,26],"51_65":[4,7,13,20],"66_75":null,over75:null},
+  balance_oc_f:{u35:[7,11,17,26],"36_50":[5,8,14,22],"51_65":[3,5,10,16],"66_75":null,over75:null},
+  srt:{u35:[3,4.5,6.5,8.5],"36_50":[2.5,4,6,8],"51_65":[2,3,5.5,7.5],"66_75":[1,2.5,4.5,6.5],over75:[0.5,1.5,3.5,5.5]},
+  cooper12:{u35:{m:[1500,1800,2200,2800],f:[1200,1500,1900,2500]},"36_50":{m:[1300,1600,2000,2600],f:[1000,1300,1700,2300]},"51_65":{m:[1100,1400,1800,2400],f:[900,1100,1500,2100]}},
+  cooper6:{"51_65":{m:[440,500,580,660],f:[380,440,510,590]},"66_75":{m:[490,570,650,730],f:[430,510,590,670]},over75:{m:[380,450,540,630],f:[320,390,470,560]}},
+  deadhang:{u35:{m:[12,20,35,55],f:[8,14,25,42]},"36_50":{m:[10,16,28,46],f:[6,11,20,36]},"51_65":{m:[7,12,20,36],f:[4,8,15,28]},"66_75":{m:[4,8,14,26],f:[3,5,10,20]},over75:null},
+};
+const PRESCRIPTIONS={
+  grip:{name:"Dinamometría · Fuerza de agarre",icon:"✊",color:"#e8855a",what:"Predictor independiente de mortalidad cardiovascular (Lancet 2015). Cada reducción de 5 kg aumenta el riesgo cardiovascular un 17%.",exercises:[{name:"Farmer's carry",sets:"3–4",reps:"20–30m",load:"Pesado",note:"El más eficaz. Agarre bajo tensión prolongada."},{name:"Dead hang en barra",sets:"3–5",reps:"15–45 seg",load:"Peso corporal",note:"Empezar con pies en suelo si no aguanta."},{name:"Squeeze con pelota",sets:"3",reps:"15–20/mano",load:"Progresivo",note:"Ideal para senior o con limitaciones."},{name:"Remo con barra o mancuerna",sets:"3–4",reps:"8–12",load:"Moderado-alto",note:"Agarre + cadena posterior."},{name:"Plancha con agarre en suelo",sets:"3",reps:"30–60 seg",load:"Peso corporal",note:"Isométrico de muñeca integrado."}],progression:"Re-test cada 6 semanas. +2–3 kg por ciclo.",frequency:"2–3×/semana."},
+  chair:{name:"Chair Stand · Fuerza tren inferior",icon:"🪑",color:"#5ab87a",what:"Validado por Rikli & Jones (n=7.183). Predice caídas, sarcopenia y pérdida de independencia. Silla 43–45 cm obligatorio.",exercises:[{name:"Sentadilla libre o asistida",sets:"3–4",reps:"10–15",load:"PC → lastrado",note:"Empezar con apoyo si necesario."},{name:"Step up / Subir escalones",sets:"3",reps:"10–15/pierna",load:"PC → chaleco",note:"Transferible a la vida diaria."},{name:"Leg press",sets:"3–4",reps:"12–15",load:"Moderado",note:"Seguro con dolor de rodilla o lumbar."},{name:"Sentadilla búlgara",sets:"3",reps:"8–10/pierna",load:"Moderado",note:"Solo perfil activo sin dolor articular."},{name:"Isométrico de cuádriceps",sets:"3–4",reps:"30–60 seg",load:"PC",note:"Sin impacto. Ideal para senior."}],progression:"Re-test cada 4 semanas. +2 rep por ciclo.",frequency:"2–3×/semana."},
+  pushups:{name:"Flexiones · Fuerza tren superior",icon:"💪",color:"#d45a5a",what:"Harvard 2019 (n=1.104): 40+ flexiones asociadas a 96% menos eventos cardiovasculares. Mide fuerza relativa al peso corporal.",exercises:[{name:"Flexión en pared (nivel 1)",sets:"3",reps:"12–20",load:"PC",note:"Entrada para gran senior o muy limitado."},{name:"Flexión desde rodillas (nivel 2)",sets:"3",reps:"8–15",load:"PC",note:"Cuerpo alineado de rodillas a hombros."},{name:"Flexión completa (nivel 3)",sets:"3–5",reps:"Fallo técnico",load:"PC",note:"Bajar 3 seg. Excéntrica es donde más se gana."},{name:"Flexión con pies elevados",sets:"3–4",reps:"8–12",load:"PC",note:"Solo perfil activo joven."},{name:"Press con mancuernas en banco",sets:"3–4",reps:"10–12",load:"Moderado-alto",note:"Complemento con sobrecarga progresiva."}],progression:"Re-test cada 3 semanas. +2–3 rep.",frequency:"2×/semana mínimo 48h recuperación."},
+  balance:{name:"Equilibrio Monopodal · Control neuromuscular",icon:"🦩",color:"#8ab4d4",what:"BJSM 2022 (n=1.702): no aguantar 10 seg dobla mortalidad a 7 años. Asimetría >20% entre piernas es clínicamente relevante.",exercises:[{name:"Apoyo monopodal progresivo",sets:"3",reps:"20–60 seg/pierna",load:"PC",note:"Ojos abiertos → cerrados → superficie inestable."},{name:"Monopodal sobre foam/bosu",sets:"3",reps:"20–40 seg",load:"PC",note:"Solo cuando supera 30 seg en suelo estable."},{name:"Zancada estática con pausa",sets:"3",reps:"10/pierna",load:"PC → mancuernas",note:"Control de rodilla y cadera."},{name:"Single leg deadlift",sets:"3",reps:"8–10/pierna",load:"Ligero → moderado",note:"Propiocepción + cadena posterior."},{name:"Marcha lenta con rodilla alta",sets:"2–3",reps:"20 pasos/lado",load:"PC",note:"Trabaja el instante monopodal de cada paso."}],progression:"Re-test cada 4 semanas.",frequency:"Diario. Mejora con práctica cotidiana."},
+  srt:{name:"Sitting-Rising Test · Movilidad funcional",icon:"🧘",color:"#b48ad4",what:"Brito et al. 2014 (n=6.396): cada punto menos = 21% más riesgo de mortalidad. PIERNAS CRUZADAS obligatorio.",exercises:[{name:"Sentarse en suelo a diario",sets:"—",reps:"Integrar en rutina",load:"—",note:"El cambio más rentable."},{name:"Hip flexor stretch profundo",sets:"3",reps:"45–60 seg/lado",load:"PC",note:"El limitante principal del SRT."},{name:"Deep squat hold",sets:"3–5",reps:"30–60 seg",load:"PC",note:"Talones en suelo, rodillas abiertas."},{name:"Turkish Get-up (TGU)",sets:"3–4",reps:"3–5/lado",load:"Sin carga → mancuerna",note:"El ejercicio que más entrena el SRT."},{name:"Movilidad de tobillo",sets:"2–3",reps:"30 seg/lado",load:"PC",note:"Limitante más ignorado del SRT."}],progression:"Re-test cada 6 semanas. +0.5–1 punto por ciclo.",frequency:"Movilidad diaria. TGU 2×/semana."},
+  cooper:{name:"Cooper · Capacidad cardiovascular",icon:"🏃",color:"#c8a45a",what:"Predictor más potente de longevidad. Cada MET adicional de VO2max reduce mortalidad cardiovascular un 9–13%.",exercises:[{name:"Caminata progresiva",sets:"1",reps:"20–45 min",load:"Ritmo conversacional",note:"Punto de entrada sedentarios."},{name:"Intervalos caminar/trotar",sets:"6–10",reps:"1 min trote / 2 min caminata",load:"RPE 6–7",note:"Más eficaz para mejorar VO2max."},{name:"Cardio zona 2",sets:"1",reps:"30–60 min",load:"FC 60–70% máx.",note:"La base aeróbica fundamental."},{name:"HIIT (perfil activo)",sets:"8–10",reps:"30 seg / 90 seg recup.",load:"RPE 8",note:"Alta respuesta de VO2max."},{name:"Remo (ergómetro)",sets:"1",reps:"20–30 min",load:"Ritmo sostenible",note:"Sin impacto articular. Ideal senior."}],progression:"Re-test cada 8 semanas.",frequency:"3–4×/semana mínimo."},
+  deadhang:{name:"Dead Hang · Resistencia de agarre",icon:"🏋️",color:"#5ad4c8",what:"Mide resistencia del agarre bajo carga prolongada. Referencia orientativa: sin normativa clínica poblacional establecida.",exercises:[{name:"Dead hang asistido (pies en suelo)",sets:"3–5",reps:"10–40 seg",load:"PC parcial",note:"Empezar con pies tocando suelo."},{name:"Dead hang intermitente",sets:"6–10",reps:"5–10 seg c/u",load:"PC",note:"Para quien no aguanta tiempo continuo."},{name:"Dead hang supino",sets:"3–4",reps:"15–45 seg",load:"PC",note:"Más fácil que pronado."},{name:"Dead hang agarre mixto",sets:"3",reps:"20–60 seg",load:"PC",note:"Alternar manos."},{name:"Farmer's carry",sets:"3–4",reps:"30–40m",load:"Pesado",note:"Mejor complemento al hang estático."}],progression:"Re-test cada 6 semanas. +5–10 seg por ciclo.",frequency:"2–3×/semana."},
+};
+const BASE_KEYS=["grip","chair","pushups","balance","srt","cooper"];
+const TEST_LABELS={grip:"Dinamómetro",chair:"Chair Stand",pushups:"Flexiones",balance:"Equilibrio",srt:"SRT",cooper:"Cooper",deadhang:"Dead Hang"};
+
+// ─── SCORING ─────────────────────────────────────────────────────────────────
+function calcScore(v,t){if(v<t[0])return 1;if(v<t[1])return 2;if(v<t[2])return 3;if(v<t[3])return 4;return 5;}
+function scoreGrip(v,ab,g){const t=TABLES.grip[ab]?.[g];return t?calcScore(parseFloat(v),t):0;}
+function scoreChair(v,ab,g){const t=TABLES.chair[ab]?.[g];return t?calcScore(parseFloat(v),t):0;}
+function scorePushups(v,ab,g,variant){const tbl=variant==="knees"?TABLES.pushups_knees:TABLES.pushups;const t=tbl[ab]?.[g];return t?calcScore(parseFloat(v),t):0;}
+function scoreBalance(v,ab,g,eyesClosed){if(!v)return 0;const fv=parseFloat(v);if(eyesClosed){const tbl=g==="m"?TABLES.balance_oc_m:TABLES.balance_oc_f;const t=tbl[ab];if(!t)return scoreBalance(v,ab,g,false);return calcScore(fv,t);}const t=TABLES.balance_oa[ab];return t?calcScore(fv,t):0;}
+function scoreSRT(v,ab){const t=TABLES.srt[ab];return t?calcScore(parseFloat(v),t):0;}
+function scoreCooper(v,ab,act,g){if(!v)return 0;const fv=parseFloat(v);const use6=(ab==="51_65"&&act==="sedentary")||ab==="66_75"||ab==="over75";if(use6){const t=TABLES.cooper6[ab]?.[g];return t?calcScore(fv,t):0;}const t=TABLES.cooper12[ab]?.[g];return t?calcScore(fv,t):0;}
+function scoreDeadhang(v,ab,g){if(!v||!TABLES.deadhang[ab])return 0;const t=TABLES.deadhang[ab]?.[g];return t?calcScore(parseFloat(v),t):0;}
+
+function getLabel(s){
+  if(s>=5)return{text:"Excelente",color:"#5ab87a"};
+  if(s>=4)return{text:"Bueno",color:"#8ab4d4"};
+  if(s>=3)return{text:"Normal",color:"#c8a45a"};
+  if(s>=2)return{text:"Deficiente",color:"#e8a05a"};
+  if(s>=1)return{text:"Muy deficiente",color:"#d45a5a"};
+  return{text:"Sin datos",color:"#888"};
+}
+function getTotalLabel(pct){
+  if(pct>=90)return{text:"Rendimiento Elite",color:"#5ab87a",desc:"Condición física excepcional. Mantener y optimizar."};
+  if(pct>=75)return{text:"Buen Estado",color:"#8ab4d4",desc:"Por encima de la media. Margen de mejora en áreas específicas."};
+  if(pct>=55)return{text:"Estado Medio",color:"#c8a45a",desc:"Condición funcional aceptable con déficits claros a trabajar."};
+  if(pct>=35)return{text:"Deficiente",color:"#e8a05a",desc:"Riesgo funcional moderado. Programa de mejora prioritario."};
+  return{text:"Atención Prioritaria",color:"#d45a5a",desc:"Riesgo funcional elevado. Intervención inmediata recomendada."};
+}
+
+// ─── VARIANT HELPERS ─────────────────────────────────────────────────────────
+function getPushV(ab,act){
+  if(ab==="over75")return{label:"Flexiones en pared",note:"Manos en pared o banco. Sin bajar al suelo."};
+  if(ab==="66_75"||(ab==="51_65"&&act==="sedentary"))return{label:"Flexiones desde rodillas",note:"Rodillas en suelo, cuerpo alineado. Pecho roza suelo."};
+  return{label:"Flexiones completas",note:"Plancha completa. Cuerpo recto de cabeza a talones."};
+}
+function getBalV(ab,act){
+  const ec=ab==="u35"||ab==="36_50"||(ab==="51_65"&&act==="active");
+  const nw=ab==="66_75"||ab==="over75";
+  return{eyesClosed:ec,nearWall:nw,
+    label:ec?"Monopodal · Ojos cerrados":"Monopodal · Ojos abiertos",
+    note:ec?"OJOS CERRADOS. Ambas piernas. Máx. 60 seg.":nw?"OJOS ABIERTOS. Cerca de pared. Ambas piernas.":"OJOS ABIERTOS, punto fijo. Ambas piernas."};
+}
+function getCoopV(ab,act){
+  const u6=(ab==="51_65"&&act==="sedentary")||ab==="66_75"||ab==="over75";
+  return u6?{label:"Cooper 6 min marcha",dur:"6 minutos",mode:"Caminar rápido",warmup:"2 min marcha suave integrada",ph:"Ej: 570"}
+           :{label:"Cooper 12 min",dur:"12 minutos",mode:"Correr / trotar",warmup:"5–7 min trote suave previo",ph:"Ej: 2200"};
+}
+function getDhV(ab,act){
+  if(ab==="over75"||!TABLES.deadhang[ab])return{available:false,reason:"No recomendado para este perfil."};
+  if(ab==="66_75"&&act==="sedentary")return{available:false,reason:"No recomendado para Senior sedentario."};
+  const grip=(ab==="u35"||ab==="36_50")?"Pronado (overhand)":(ab==="51_65"&&act==="active")?"Pronado o mixto":"Supino (underhand)";
+  return{available:true,grip,safetyBox:ab==="66_75"};
+}
+function getSrtV(ab,act){
+  return{highRisk:ab==="over75"||(ab==="66_75"&&act==="sedentary"),moderate:ab==="66_75"&&act==="active"};
+}
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const state={
+  themeKey:"slate",
+  step:"setup",
+  name:"",age:"",ageBand:null,activity:null,gender:null,
+  values:{grip:"",chair:"",pushups:"",balance_r:"",balance_l:"",srt:"",cooper:"",deadhang:""},
+  srtDown:{hand:0,knee:0,forearm:0,balance:0},
+  srtUp:{hand:0,knee:0,forearm:0,balance:0},
+  skippedSrt:false,
+  hangEnabled:false,
+  pushupsVariant:null,
+  activeTest:"grip",
+  activePrescription:null,
+  hangRunning:false,
+  hangElapsed:0,
+  hangTimer:null,
+};
+
+function T(){return THEMES[state.themeKey];}
+
+function setState(updates){
+  Object.assign(state,updates);
+  render();
+}
+
+// ─── COMPUTED ────────────────────────────────────────────────────────────────
+function getScores(){
+  const{ageBand:ab,activity:act,gender:g,values:v,pushupsVariant:pv,skippedSrt,hangEnabled}=state;
+  if(!ab||!act||!g)return{};
+  const balV=getBalV(ab,act);
+  const dhV=getDhV(ab,act);
+  const activeKeys=hangEnabled&&dhV.available?[...BASE_KEYS,"deadhang"]:BASE_KEYS;
+  const br=v.balance_r?scoreBalance(v.balance_r,ab,g,balV.eyesClosed):5;
+  const bl=v.balance_l?scoreBalance(v.balance_l,ab,g,balV.eyesClosed):5;
+  const balScore=(v.balance_r||v.balance_l)?Math.min(br,bl):0;
+  const srtVal=deductSRT();
+  return{
+    grip:v.grip?scoreGrip(v.grip,ab,g):0,
+    chair:v.chair?scoreChair(v.chair,ab,g):0,
+    pushups:v.pushups?scorePushups(v.pushups,ab,g,pv||"full"):0,
+    balance:balScore,
+    srt:skippedSrt?0:(srtVal>0?scoreSRT(String(srtVal),ab):0),
+    cooper:v.cooper?scoreCooper(v.cooper,ab,act,g):0,
+    deadhang:v.deadhang?scoreDeadhang(v.deadhang,ab,g):0,
+  };
+}
+function getActiveKeys(){
+  const{hangEnabled,ageBand:ab,activity:act}=state;
+  if(!ab||!act)return BASE_KEYS;
+  const dhV=getDhV(ab,act);
+  return hangEnabled&&dhV.available?[...BASE_KEYS,"deadhang"]:BASE_KEYS;
+}
+function deductSRT(){
+  const{srtDown:d,srtUp:u}=state;
+  const ded=s=>s.hand+s.knee+s.forearm+s.balance*0.5;
+  return Math.max(0,10-ded(d)-ded(u));
+}
+function getBalAsym(){
+  const{values:v}=state;
+  if(!v.balance_r||!v.balance_l)return null;
+  return(Math.abs(parseFloat(v.balance_r)-parseFloat(v.balance_l))/Math.max(parseFloat(v.balance_r),parseFloat(v.balance_l))*100).toFixed(0);
+}
+function getPct(){
+  const scores=getScores();
+  const keys=getActiveKeys();
+  const{skippedSrt,values:v}=state;
+  const scored=keys.filter(k=>!skippedSrt||(k!=="srt"))
+    .filter(k=>k==="balance"?(v.balance_r||v.balance_l):(k==="srt"?deductSRT()>0||v.srt:v[k]));
+  const total=scored.reduce((a,k)=>a+scores[k],0);
+  const max=scored.length*5;
+  return{pct:max>0?Math.round(total/max*100):0,total,max,scoredKeys:scored};
+}
+
+// ─── DOM HELPERS ─────────────────────────────────────────────────────────────
+function el(tag,attrs={},children=[]){
+  const e=document.createElement(tag);
+  Object.entries(attrs).forEach(([k,v])=>{
+    if(k==="style"&&typeof v==="object"){Object.assign(e.style,v);}
+    else if(k.startsWith("on")&&typeof v==="function"){e.addEventListener(k.slice(2).toLowerCase(),v);}
+    else if(k==="className"){e.className=v;}
+    else{e[k]=v;}
+  });
+  children.forEach(c=>{
+    if(c===null||c===undefined)return;
+    if(typeof c==="string"||typeof c==="number"){e.appendChild(document.createTextNode(String(c)));}
+    else if(c instanceof Node){e.appendChild(c);}
+  });
+  return e;
+}
+function div(style={},children=[]){return el("div",{style},children);}
+function span(style={},text){return el("span",{style},[text]);}
+function btn(style={},text,onClick){return el("button",{style,onClick},[text]);}
+function inp(style={},attrs={}){return el("input",{style,...attrs});}
+function h(level,style={},text){return el("h"+level,{style},[text]);}
+function p(style={},text){return el("p",{style},[text]);}
+
+// ─── THEME SWITCHER ───────────────────────────────────────────────────────────
+function themeSwitcher(){
+  const dots=[{key:"dark",bg:"#0c0c10",ring:"#c8a45a"},{key:"slate",bg:"#1e2535",ring:"#3dd6a3"},{key:"light",bg:"#f5f2ee",ring:"#4a7c6f"}];
+  const t=T();
+  const wrap=div({position:"fixed",top:"14px",right:"16px",display:"flex",gap:"9px",zIndex:"1000",alignItems:"center",background:t.bgCard+"cc",borderRadius:"20px",padding:"6px 10px",border:`1px solid ${t.border}`});
+  dots.forEach(d=>{
+    const dot=div({width:"18px",height:"18px",borderRadius:"50%",background:d.bg,border:`2px solid ${state.themeKey===d.key?d.ring:t.border}`,cursor:"pointer",transition:"all 0.2s",transform:state.themeKey===d.key?"scale(1.3)":"scale(1)",boxShadow:state.themeKey===d.key?`0 0 8px ${d.ring}80`:""});
+    dot.addEventListener("click",()=>setState({themeKey:d.key}));
+    wrap.appendChild(dot);
+  });
+  return wrap;
+}
+
+// ─── SCORE BARS ──────────────────────────────────────────────────────────────
+function scoreBars(score,color){
+  const t=T();
+  const wrap=div({display:"flex",gap:"4px"});
+  for(let i=1;i<=5;i++){
+    wrap.appendChild(div({flex:"1",height:"5px",borderRadius:"3px",background:i<=score?color:t.border,transition:"background 0.3s"}));
+  }
+  return wrap;
+}
+
+// ─── SETUP SCREEN ────────────────────────────────────────────────────────────
+function setupScreen(){
+  const t=T();
+  const{name,age,ageBand,activity,gender,hangEnabled}=state;
+  const dhV=ageBand&&activity?getDhV(ageBand,activity):{available:false,reason:""};
+  const canStart=ageBand&&activity&&gender;
+
+  const wrap=div({minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"});
+  const inner=div({maxWidth:"560px",width:"100%"});
+
+  // Header
+  const hdr=div({textAlign:"center",marginBottom:"40px"});
+  hdr.appendChild(div({fontSize:"10px",letterSpacing:"5px",color:t.accent,marginBottom:"14px"},["EVALUACIÓN FÍSICA FUNCIONAL"]));
+  const h1=el("h1",{style:{fontFamily:"'Playfair Display',Georgia,serif",fontSize:"42px",fontWeight:"400",lineHeight:"1.15",marginBottom:"10px",color:t.text}});
+  h1.innerHTML=`Test de<br><em style="color:${t.accent}">Condición Física</em>`;
+  hdr.appendChild(h1);
+  hdr.appendChild(div({fontSize:"12px",color:t.textDim,lineHeight:"1.7"},["Configura el perfil del cliente antes de comenzar"]));
+  inner.appendChild(hdr);
+
+  const card=div({background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:"20px",padding:"32px"});
+
+  // Name + Age
+  const row1=div({display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"20px"});
+  row1.appendChild(fieldEl(t,"Nombre del cliente",name,"Ana García...","text",v=>setState({name:v})));
+  row1.appendChild(fieldEl(t,"Edad",age,"48","number",v=>{
+    setState({age:v});
+    const n=parseInt(v);
+    if(!isNaN(n)){
+      const ab=n<=35?"u35":n<=50?"36_50":n<=65?"51_65":n<=75?"66_75":"over75";
+      setState({ageBand:ab});
+    }
+  }));
+  card.appendChild(row1);
+
+  // Age bands
+  const ageSec=div({marginBottom:"20px"});
+  ageSec.appendChild(sLabelEl(t,"Franja de edad"));
+  const bandGrid=div({display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:"8px"});
+  AGE_BANDS.forEach(b=>{
+    const active=ageBand===b.id;
+    const bDiv=div({background:active?b.color+"22":t.bgInput,border:`1px solid ${active?b.color:t.border}`,borderRadius:"10px",padding:"10px 4px",textAlign:"center",cursor:"pointer",transition:"all 0.15s"});
+    bDiv.appendChild(div({fontFamily:"monospace",fontSize:"12px",color:active?b.color:t.text},[b.label]));
+    bDiv.appendChild(div({fontFamily:"monospace",fontSize:"9px",color:t.textDim,marginTop:"3px"},[b.desc]));
+    bDiv.addEventListener("click",()=>setState({ageBand:b.id}));
+    bandGrid.appendChild(bDiv);
+  });
+  ageSec.appendChild(bandGrid);
+  if(age&&ageBand){
+    const band=AGE_BANDS.find(b=>b.id===ageBand);
+    ageSec.appendChild(div({marginTop:"7px",fontSize:"10px",color:band.color},[`✓ ${age} años → ${band.desc} (${band.label})`]));
+  }
+  card.appendChild(ageSec);
+
+  // Activity
+  const actSec=div({marginBottom:"20px"});
+  actSec.appendChild(sLabelEl(t,"Nivel de actividad"));
+  const actGrid=div({display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"});
+  [{key:"active",icon:"🏃",title:"Activo",desc:"Entrena ≥2×/semana o deporte habitual",color:"#c8a45a"},
+   {key:"sedentary",icon:"🛋️",title:"Sedentario",desc:"Sin actividad física regular",color:"#8ab4d4"}].forEach(o=>{
+    const active=activity===o.key;
+    const c=choiceCardEl(t,o.icon,o.title,o.desc,o.color,active,()=>setState({activity:o.key}));
+    actGrid.appendChild(c);
+  });
+  actSec.appendChild(actGrid);
+  actSec.appendChild(div({marginTop:"8px",fontSize:"9px",color:t.textMuted,padding:"6px 10px",background:t.bgInput,borderRadius:"8px"},["ℹ El nivel de actividad determina el protocolo, no el baremo. Los umbrales de riesgo son iguales para todos."]));
+  card.appendChild(actSec);
+
+  // Gender
+  const genSec=div({marginBottom:"20px"});
+  genSec.appendChild(sLabelEl(t,"Sexo biológico"));
+  const genGrid=div({display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"});
+  [{key:"m",icon:"♂",title:"Hombre",color:"#5ab87a"},{key:"f",icon:"♀",title:"Mujer",color:"#d45a5a"}].forEach(o=>{
+    genGrid.appendChild(choiceCardEl(t,o.icon,o.title,"",o.color,gender===o.key,()=>setState({gender:o.key})));
+  });
+  genSec.appendChild(genGrid);
+  card.appendChild(genSec);
+
+  // Dead hang toggle
+  const dhSec=div({marginBottom:"24px",background:t.bgInput,border:`1px solid ${t.border}`,borderRadius:"12px",padding:"16px"});
+  const dhRow=div({display:"flex",justifyContent:"space-between",alignItems:"center"});
+  const dhLeft=div({});
+  dhLeft.appendChild(div({fontFamily:"monospace",fontSize:"12px",color:"#5ad4c8"},["🏋️ Añadir Dead Hang"]));
+  dhLeft.appendChild(div({fontFamily:"monospace",fontSize:"10px",color:t.textDim,marginTop:"3px"},["Test 7 opcional · Requiere barra"]));
+  dhRow.appendChild(dhLeft);
+  const toggle=div({width:"44px",height:"24px",borderRadius:"12px",background:hangEnabled?"#5ad4c8":t.border,cursor:"pointer",position:"relative",transition:"all 0.2s",flexShrink:"0"});
+  const knob=div({position:"absolute",top:"3px",left:hangEnabled?"22px":"3px",width:"18px",height:"18px",borderRadius:"50%",background:hangEnabled?t.bg:t.textDim,transition:"all 0.2s"});
+  toggle.appendChild(knob);
+  toggle.addEventListener("click",()=>setState({hangEnabled:!state.hangEnabled}));
+  dhRow.appendChild(toggle);
+  dhSec.appendChild(dhRow);
+  if(hangEnabled&&ageBand&&activity){
+    if(!dhV.available){
+      dhSec.appendChild(div({marginTop:"10px",fontSize:"10px",color:"#e8a05a",background:"#e8a05a18",borderRadius:"8px",padding:"8px 12px"},[`⚠ ${dhV.reason}`]));
+    } else {
+      dhSec.appendChild(div({marginTop:"8px",fontSize:"10px",color:"#5ad4c8"},[`Agarre: ${dhV.grip}${dhV.safetyBox?" · ⚠ Cajón de seguridad debajo":""}`]));
+    }
+  }
+  card.appendChild(dhSec);
+
+  // Start button
+  const startBtn=btn({width:"100%",background:canStart?t.btnPrimary:t.bgInput,color:canStart?t.btnPrimaryText:t.textMuted,border:"none",borderRadius:"12px",padding:"16px",fontSize:"13px",letterSpacing:"2px",cursor:canStart?"pointer":"default",transition:"all 0.2s"},"COMENZAR EVALUACIÓN →",()=>{
+    if(canStart)setState({step:"tests",activeTest:"grip"});
+  });
+  card.appendChild(startBtn);
+  inner.appendChild(card);
+  wrap.appendChild(inner);
+  return wrap;
+}
+
+// ─── TESTS SCREEN ────────────────────────────────────────────────────────────
+function testsScreen(){
+  const t=T();
+  const{ageBand:ab,activity:act,gender:g,name,age,activeTest,hangEnabled,pushupsVariant:pvc,skippedSrt,values:v}=state;
+  const bandInfo=AGE_BANDS.find(b=>b.id===ab);
+  const scores=getScores();
+  const activeKeys=getActiveKeys();
+  const dhV=getDhV(ab,act);
+  const balV=getBalV(ab,act);
+  const coopV=getCoopV(ab,act);
+  const srtV=getSrtV(ab,act);
+  const impact=HEALTH_IMPACT[activeTest];
+  const pres=PRESCRIPTIONS[activeTest]||PRESCRIPTIONS.grip;
+  const atIdx=activeKeys.indexOf(activeTest);
+  const atScore=activeTest==="balance"?(v.balance_r||v.balance_l?scores.balance:null)
+    :activeTest==="srt"?(deductSRT()>0?scores.srt:null)
+    :(v[activeTest]?scores[activeTest]:null);
+  const atLbl=atScore?getLabel(atScore):null;
+  const{pct,scoredKeys}=getPct();
+  const filled=activeKeys.filter(k=>skippedSrt&&k==="srt"?true:(k==="balance"?(v.balance_r||v.balance_l):(k==="srt"?deductSRT()>0:v[k])));
+
+  const wrap=div({display:"grid",gridTemplateColumns:"220px 1fr",minHeight:"100vh"});
+
+  // SIDEBAR
+  const sidebar=div({borderRight:`1px solid ${t.border}`,display:"flex",flexDirection:"column",background:t.bgCard});
+  const sHead=div({padding:"20px 18px",borderBottom:`1px solid ${t.border}`});
+  sHead.appendChild(div({fontSize:"9px",letterSpacing:"3px",color:t.accent,marginBottom:"5px"},["CLIENTE"]));
+  sHead.appendChild(div({fontSize:"14px",fontFamily:"'Playfair Display',Georgia,serif",color:t.text},[name||"Sin nombre"]));
+  sHead.appendChild(div({fontSize:"9px",color:t.textDim,marginTop:"3px",lineHeight:"1.6"},[`${age} años · ${bandInfo?.desc}`,el("br"),`${act==="active"?"Activo":"Sedentario"} · ${g==="m"?"Hombre":"Mujer"}`]));
+  sidebar.appendChild(sHead);
+  const sNav=div({flex:"1",paddingTop:"6px"});
+  activeKeys.forEach(k=>{
+    const isH=k==="deadhang";
+    const done=skippedSrt&&k==="srt"?true:(k==="balance"?(v.balance_r||v.balance_l):(k==="srt"?deductSRT()>0:v[k]));
+    const s=done&&!(skippedSrt&&k==="srt")?scores[k]:null;
+    const lbl=s?getLabel(s):null;
+    const active=activeTest===k;
+    const row=div({padding:"10px 18px",cursor:"pointer",background:active?t.accentBg:"transparent",borderLeft:`3px solid ${active?(isH?"#5ad4c8":t.accent):"transparent"}`,transition:"all 0.15s"});
+    const rRow=div({display:"flex",justifyContent:"space-between",alignItems:"center"});
+    rRow.appendChild(div({fontSize:"11px",color:active?t.text:t.textDim},[(isH?"★ ":"")+TEST_LABELS[k]]));
+    if(skippedSrt&&k==="srt"){rRow.appendChild(div({fontSize:"8px",color:"#e8a05a"},["OMITIDO"]));}
+    else if(lbl){rRow.appendChild(div({fontFamily:"monospace",fontSize:"17px",fontWeight:"600",color:lbl.color},[String(s)]));}
+    else{rRow.appendChild(div({width:"6px",height:"6px",borderRadius:"50%",background:t.border}));}
+    row.appendChild(rRow);
+    if(lbl&&!(skippedSrt&&k==="srt"))row.appendChild(div({fontSize:"8px",color:lbl.color,letterSpacing:"1px",marginTop:"1px"},[lbl.text.toUpperCase()]));
+    row.addEventListener("click",()=>setState({activeTest:k}));
+    sNav.appendChild(row);
+  });
+  sidebar.appendChild(sNav);
+  const sFoot=div({padding:"14px 18px",borderTop:`1px solid ${t.border}`});
+  sFoot.appendChild(div({fontSize:"9px",color:t.textMuted,marginBottom:"3px"},["COMPLETADOS"]));
+  const sScore=div({fontFamily:"'Playfair Display',Georgia,serif",fontSize:"24px",color:t.accent});
+  sScore.innerHTML=`${filled.length}<span style="font-size:12px;color:${t.textDim}">/${activeKeys.length}</span>`;
+  sFoot.appendChild(sScore);
+  if(filled.length>0)sFoot.appendChild(div({fontSize:"9px",color:t.textDim,marginTop:"1px"},[`Parcial: ${pct}%`]));
+  sidebar.appendChild(sFoot);
+  wrap.appendChild(sidebar);
+
+  // MAIN
+  const main=div({padding:"36px 44px",overflowY:"auto",background:t.bg});
+  const inner=div({maxWidth:"600px"});
+
+  // Header
+  const mHead=div({display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"18px"});
+  const mHL=div({});
+  mHL.appendChild(div({fontSize:"9px",letterSpacing:"3px",color:pres.color,marginBottom:"6px"},[activeTest==="deadhang"?"TEST OPCIONAL":`TEST ${atIdx+1} DE ${BASE_KEYS.length}`]));
+  mHL.appendChild(h(2,{fontFamily:"'Playfair Display',Georgia,serif",fontSize:"28px",fontWeight:"400",color:t.text,marginBottom:"4px"},`${pres.icon} ${TEST_LABELS[activeTest]}`));
+  if(activeTest==="pushups")mHL.appendChild(div({fontSize:"10px",color:t.textDim},[pvc==="knees"?"🦵 Desde rodillas":pvc==="full"?"💪 Plancha completa":"Selecciona variante"]));
+  if(activeTest==="balance")mHL.appendChild(div({fontSize:"10px",color:t.textDim},[balV.label]));
+  if(activeTest==="cooper")mHL.appendChild(div({fontSize:"10px",color:t.textDim},[`${coopV.label} · ${coopV.mode}`]));
+  if(activeTest==="deadhang"&&dhV.available)mHL.appendChild(div({fontSize:"10px",color:"#5ad4c8"},[`Agarre: ${dhV.grip}`]));
+  mHead.appendChild(mHL);
+  if(atScore){
+    const mHR=div({textAlign:"right"});
+    mHR.appendChild(div({fontFamily:"'Playfair Display',Georgia,serif",fontSize:"50px",color:atLbl.color,lineHeight:"1"},[String(atScore)]));
+    mHR.appendChild(div({fontSize:"9px",letterSpacing:"2px",color:atLbl.color},[atLbl.text.toUpperCase()]));
+    mHead.appendChild(mHR);
+  }
+  inner.appendChild(mHead);
+
+  // Health impact
+  const impactDiv=div({background:t.accentBg,border:`1px solid ${t.accentBorder}`,borderRadius:"12px",padding:"12px 16px",marginBottom:"14px",display:"flex",gap:"12px",alignItems:"flex-start"});
+  impactDiv.appendChild(div({fontSize:"18px",flexShrink:"0"},[impact.icon]));
+  const impText=div({});
+  impText.appendChild(div({fontSize:"11px",color:t.text,lineHeight:"1.6",marginBottom:"3px"},[impact.text]));
+  impText.appendChild(div({fontSize:"9px",color:t.textDim,letterSpacing:"1px"},[impact.source]));
+  impactDiv.appendChild(impText);
+  inner.appendChild(impactDiv);
+
+  // SRT skip warning
+  if(activeTest==="srt"&&(srtV.highRisk||srtV.moderate)){
+    const warn=div({background:"#e8a05a15",border:"1px solid #e8a05a40",borderRadius:"12px",padding:"12px 16px",marginBottom:"12px"});
+    warn.appendChild(div({fontSize:"10px",color:"#e8a05a",marginBottom:"8px"},[srtV.highRisk?"⚠ Perfil de riesgo elevado para bajar al suelo.":"⚠ Realizar con colchoneta y asistente cerca."]));
+    if(!skippedSrt){
+      const skipBtn=btn({background:"transparent",border:"1px solid #e8a05a",borderRadius:"8px",padding:"6px 14px",color:"#e8a05a",fontSize:"10px"},"Marcar como no realizable → registrar limitación funcional",()=>setState({skippedSrt:true}));
+      warn.appendChild(skipBtn);
+    } else {
+      const undoRow=div({display:"flex",alignItems:"center",gap:"10px"});
+      undoRow.appendChild(div({fontSize:"10px",color:"#e8a05a"},["✓ Marcado como limitación funcional"]));
+      undoRow.appendChild(btn({background:"transparent",border:`1px solid ${t.border}`,borderRadius:"8px",padding:"4px 10px",color:t.textDim,fontSize:"9px"},"Deshacer",()=>setState({skippedSrt:false})));
+      warn.appendChild(undoRow);
+    }
+    inner.appendChild(warn);
+  }
+
+  // Pushups variant selector
+  if(activeTest==="pushups"&&!skippedSrt){
+    const pvSec=div({background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:"14px",padding:"18px",marginBottom:"12px"});
+    pvSec.appendChild(div({fontSize:"9px",letterSpacing:"3px",color:t.textDim,marginBottom:"10px"},["¿CON QUÉ VARIANTE REALIZAMOS EL TEST?"]));
+    pvSec.appendChild(div({fontSize:"10px",color:t.textDim,marginBottom:"12px",lineHeight:"1.6"},["Observa al cliente intentar una flexión. Decide según la ejecución técnica."]));
+    const pvGrid=div({display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"});
+    [{key:"full",icon:"💪",title:"Plancha completa",desc:"Cuerpo recto de cabeza a talones.",color:"#d45a5a"},
+     {key:"knees",icon:"🦵",title:"Desde rodillas",desc:"Cuerpo alineado de rodillas a hombros.",color:"#8ab4d4"}].forEach(o=>{
+      const active=pvc===o.key;
+      const c=div({background:active?o.color+"18":t.bgInput,border:`1px solid ${active?o.color:t.border}`,borderRadius:"12px",padding:"14px",cursor:"pointer",transition:"all 0.15s",textAlign:"center"});
+      c.appendChild(div({fontSize:"26px",marginBottom:"6px"},[o.icon]));
+      c.appendChild(div({fontSize:"12px",color:active?o.color:t.text,marginBottom:"4px"},[o.title]));
+      c.appendChild(div({fontSize:"10px",color:t.textDim,lineHeight:"1.5"},[o.desc]));
+      c.addEventListener("click",()=>setState({pushupsVariant:o.key}));
+      pvGrid.appendChild(c);
+    });
+    pvSec.appendChild(pvGrid);
+    if(pvc)pvSec.appendChild(div({marginTop:"10px",background:t.bgInput,borderRadius:"8px",padding:"8px 12px",fontSize:"9px",color:t.textMuted},["ℹ El re-test debe usar la misma variante para ser comparable."]));
+    inner.appendChild(pvSec);
+  }
+
+  // Protocol
+  if(!skippedSrt||activeTest!=="srt"){
+    const proto=div({background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:"14px",padding:"18px",marginBottom:"14px"});
+    proto.appendChild(div({fontSize:"9px",letterSpacing:"3px",color:t.textDim,marginBottom:"8px"},["PROTOCOLO"]));
+    if(activeTest==="grip"){
+      proto.appendChild(div({background:t.bgInput,borderRadius:"8px",padding:"8px 12px",marginBottom:"10px",fontSize:"10px",color:"#e8a05a"},["⚠ Verificar que el dinamómetro esté en KG, no en lbs. Si muestra libras: ÷ 2.205"]));
+    }
+    if(activeTest==="chair"){
+      const cg=div({display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"10px"});
+      [["ALTURA SILLA","43–45 cm · Sin brazos"],["POSTURA","Espalda recta · No apoyar en respaldo"],["BRAZOS","Cruzados sobre el pecho"],["REP VÁLIDA","Extensión completa · Sin rebotar"]].forEach(([k,v2])=>{
+        const cd=div({background:t.bgInput,borderRadius:"8px",padding:"8px 10px"});
+        cd.appendChild(div({fontSize:"8px",color:t.textMuted,marginBottom:"2px"},[k]));
+        cd.appendChild(div({fontSize:"10px",color:t.text},[v2]));
+        cg.appendChild(cd);
+      });
+      proto.appendChild(cg);
+    }
+    let protoNote="";
+    if(activeTest==="grip")protoNote="Mano dominante. 3 intentos, mejor marca. Brazo extendido. Apretar al máximo 3–5 seg.";
+    else if(activeTest==="chair")protoNote="Levantarse y sentarse completamente en 30 segundos. Sin apoyo de manos.";
+    else if(activeTest==="pushups")protoNote=pvc==="knees"?"Rodillas en suelo, cuerpo alineado. Pecho roza suelo. Hasta el fallo técnico.":pvc==="full"?"Plancha completa. Cuerpo recto. Pecho toca suelo. Hasta el fallo técnico.":"Selecciona la variante primero.";
+    else if(activeTest==="balance")protoNote=balV.note;
+    else if(activeTest==="srt")protoNote="PIERNAS CRUZADAS obligatorio. Sentarse y levantarse sin apoyos. −1 por apoyo, −0.5 por pérdida de equilibrio.";
+    else if(activeTest==="cooper")protoNote=`${coopV.mode} durante ${coopV.dur}. Medir metros totales recorridos.`;
+    else if(activeTest==="deadhang")protoNote=`Agarre ${dhV.available?dhV.grip:"—"}. Cuerpo estático. START al colgarse, STOP al soltar.`;
+    proto.appendChild(div({fontSize:"11px",color:t.text,lineHeight:"1.7",marginBottom:"8px"},[protoNote]));
+    if(activeTest==="cooper")proto.appendChild(div({background:t.bgInput,borderRadius:"8px",padding:"8px 12px",fontSize:"10px",color:t.textDim},[`Calentamiento: ${coopV.warmup}`]));
+    if(activeTest==="deadhang"&&dhV.available&&dhV.safetyBox)proto.appendChild(div({background:"#e8a05a15",border:"1px solid #e8a05a40",borderRadius:"8px",padding:"8px 12px",fontSize:"10px",color:"#e8a05a",marginTop:"8px"},["⚠ Cajón o banco debajo para descenso seguro"]));
+    if(activeTest==="chair"&&(ab==="u35"||ab==="36_50"||ab==="51_65"))proto.appendChild(div({marginTop:"8px",fontSize:"9px",color:t.textMuted,padding:"6px 10px",background:t.bgInput,borderRadius:"8px"},["ℹ Baremos para <60 años basados en extrapolación — sin estudio poblacional grande."]));
+    if(activeTest==="deadhang")proto.appendChild(div({marginTop:"8px",fontSize:"9px",color:t.textMuted,padding:"6px 10px",background:t.bgInput,borderRadius:"8px"},["ℹ Valores orientativos — sin normativa clínica poblacional establecida."]));
+    inner.appendChild(proto);
+  }
+
+  // INPUT AREA
+  if(activeTest==="srt"&&!skippedSrt){
+    inner.appendChild(srtCalcEl(t));
+  } else if(activeTest==="balance"){
+    inner.appendChild(balanceInputEl(t,balV.eyesClosed,scores,atLbl));
+  } else if(activeTest==="deadhang"){
+    inner.appendChild(hangTimerEl(t,scores.deadhang,scores.deadhang?getLabel(scores.deadhang):null));
+  } else if(activeTest==="pushups"&&!pvc){
+    inner.appendChild(div({background:t.bgCard,border:`1px dashed ${t.border}`,borderRadius:"14px",padding:"32px",marginBottom:"14px",textAlign:"center"},[
+      div({fontSize:"24px",marginBottom:"10px"},["⬆"]),
+      div({fontSize:"12px",color:t.textDim},["Selecciona la variante para registrar el resultado"]),
+    ]));
+  } else if(!(skippedSrt&&activeTest==="srt")){
+    const inputDiv=div({background:t.bgCard,border:`1px solid ${pres.color}40`,borderRadius:"14px",padding:"20px",marginBottom:"14px"});
+    inputDiv.appendChild(div({fontSize:"9px",letterSpacing:"3px",color:t.textDim,marginBottom:"10px"},["RESULTADO"]));
+    const iRow=div({display:"flex",gap:"12px",alignItems:"center"});
+    const input=inp({flex:"1",background:t.bgInput,border:`1px solid ${pres.color}60`,borderRadius:"10px",padding:"14px 18px",color:t.text,fontSize:"28px",textAlign:"center"},{type:"number",value:v[activeTest]||"",placeholder:activeTest==="grip"?"Ej: 42":activeTest==="chair"?"Ej: 14":activeTest==="pushups"?"Ej: 18":coopV.ph});
+    input.addEventListener("input",e=>{
+      const vals={...state.values};
+      vals[activeTest]=e.target.value;
+      setState({values:vals});
+    });
+    iRow.appendChild(input);
+    iRow.appendChild(div({fontSize:"12px",color:t.textDim,minWidth:"80px"},[activeTest==="grip"?"kg":activeTest==="chair"||activeTest==="pushups"?"rep":"metros"]));
+    inputDiv.appendChild(iRow);
+    if(atScore){inputDiv.appendChild(div({marginTop:"12px"},[scoreBars(atScore,atLbl.color)]));}
+    inner.appendChild(inputDiv);
+  }
+
+  // NAV BUTTONS
+  const navRow=div({display:"flex",gap:"10px",marginTop:"4px"});
+  if(atIdx>0){
+    navRow.appendChild(btn({flex:"1",background:"transparent",border:`1px solid ${t.border}`,borderRadius:"10px",padding:"12px",color:t.textDim,fontSize:"11px"},`← ${TEST_LABELS[activeKeys[atIdx-1]]}`,()=>setState({activeTest:activeKeys[atIdx-1]})));
+  }
+  if(atIdx<activeKeys.length-1){
+    const nextKey=activeKeys[atIdx+1];
+    navRow.appendChild(btn({flex:"1",background:t.accentBg,border:`1px solid ${t.accentBorder}`,borderRadius:"10px",padding:"12px",color:t.accent,fontSize:"11px"},`${TEST_LABELS[nextKey]} →`,()=>setState({activeTest:nextKey})));
+  } else {
+    navRow.appendChild(btn({flex:"1",background:t.btnPrimary,border:"none",borderRadius:"10px",padding:"12px",color:t.btnPrimaryText,fontSize:"12px",letterSpacing:"2px"},"VER RESULTADOS →",()=>setState({step:"results"})));
+  }
+  inner.appendChild(navRow);
+  if(filled.length>=3){
+    inner.appendChild(btn({width:"100%",marginTop:"8px",background:"transparent",border:`1px solid ${t.border}`,borderRadius:"10px",padding:"10px",color:t.textDim,fontSize:"10px"},`Ver resultados parciales (${filled.length} completados)`,()=>setState({step:"results"})));
+  }
+
+  main.appendChild(inner);
+  wrap.appendChild(main);
+  return wrap;
+}
+
+// ─── RESULTS SCREEN ───────────────────────────────────────────────────────────
+function resultsScreen(){
+  const t=T();
+  const{ageBand:ab,activity:act,gender:g,name,age,activePrescription,skippedSrt,values:v,pushupsVariant:pvc,hangEnabled}=state;
+  const bandInfo=AGE_BANDS.find(b=>b.id===ab);
+  const scores=getScores();
+  const activeKeys=getActiveKeys();
+  const dhV=getDhV(ab,act);
+  const{pct,total,max,scoredKeys}=getPct();
+  const totLbl=getTotalLabel(pct);
+  const balAsym=getBalAsym();
+  const priorityTests=activeKeys.filter(k=>!skippedSrt||(k!=="srt"))
+    .filter(k=>k==="balance"?(v.balance_r||v.balance_l):(k==="srt"?deductSRT()>0:v[k]))
+    .sort((a,b)=>scores[a]-scores[b]);
+  const deficits=priorityTests.filter(k=>scores[k]<=2);
+  const strong=priorityTests.filter(k=>scores[k]>=4);
+
+  // Reliability
+  const baseCompleted=scoredKeys.filter(k=>k!=="deadhang").length;
+  const rel=baseCompleted>=4?"valid":baseCompleted===3?"partial":"low";
+  const rc={
+    valid:{color:"#5ab87a",icon:"✅",label:`Resultado válido · ${scoredKeys.length} de ${activeKeys.length} tests`,msg:`Basado en ${scoredKeys.length} test${scoredKeys.length>1?"s":""} completados.`},
+    partial:{color:"#c8a45a",icon:"🟡",label:`Resultado parcial · ${scoredKeys.length} de ${activeKeys.length} tests`,msg:"Completa 1 test más para alcanzar el mínimo recomendado."},
+    low:{color:"#d45a5a",icon:"🔴",label:`Resultado no representativo · ${scoredKeys.length} de ${activeKeys.length} tests`,msg:`Con menos de 4 tests el porcentaje puede estar sesgado. Completa al menos ${4-baseCompleted} test${4-baseCompleted>1?"s":""} más.`},
+  }[rel];
+
+  // Diagnosis text
+  function diagText(){
+    if(scoredKeys.length===0)return"Completa al menos un test para ver el diagnóstico.";
+    let t2="";
+    if(pct>=75)t2+=`${name||"El cliente"} presenta una condición física por encima de la media para su perfil (${bandInfo?.desc}, ${age} años). `;
+    else if(pct>=55)t2+=`${name||"El cliente"} presenta una condición funcional dentro de la media con áreas de mejora identificadas. `;
+    else t2+=`${name||"El cliente"} presenta déficits funcionales que requieren un programa de intervención estructurado. `;
+    if(strong.length>0)t2+=`Puntos fuertes: ${strong.map(k=>TEST_LABELS[k]).join(", ")}. `;
+    if(deficits.length>0)t2+=`Prioridades inmediatas: ${deficits.map(k=>TEST_LABELS[k]).join(", ")}. `;
+    if(skippedSrt)t2+="Limitación funcional registrada en SRT — dato clínicamente relevante. ";
+    if(deficits.length===0&&pct>=55)t2+="No se detectan déficits críticos. Mantener y progresar.";
+    return t2;
+  }
+
+  const wrap=div({});
+  const inner=div({maxWidth:"860px",margin:"0 auto",padding:"44px 28px"});
+
+  // Header
+  const hdr=div({marginBottom:"32px"});
+  hdr.appendChild(div({fontSize:"9px",letterSpacing:"5px",color:t.accent,marginBottom:"10px"},["INFORME DE EVALUACIÓN"]));
+  hdr.appendChild(h(1,{fontFamily:"'Playfair Display',Georgia,serif",fontSize:"44px",fontWeight:"400",color:t.text,marginBottom:"6px"},name||"Cliente"));
+  hdr.appendChild(div({fontSize:"11px",color:t.textDim,display:"flex",gap:"14px",flexWrap:"wrap"},[
+    `${age} años · ${bandInfo?.desc} (${bandInfo?.label})  ·  ${act==="active"?"Activo":"Sedentario"}  ·  ${g==="m"?"Hombre":"Mujer"}`
+  ]));
+  inner.appendChild(hdr);
+
+  // Total score
+  const totalDiv=div({background:t.gradient,border:`1px solid ${totLbl.color}40`,borderRadius:"20px",padding:"28px",marginBottom:"14px",display:"grid",gridTemplateColumns:"1fr auto",gap:"20px",alignItems:"center"});
+  const tL=div({});
+  tL.appendChild(div({fontSize:"9px",letterSpacing:"3px",color:t.textDim,marginBottom:"8px"},["PUNTUACIÓN GLOBAL"]));
+  const tScore=div({fontFamily:"'Playfair Display',Georgia,serif",fontSize:"52px",color:totLbl.color,lineHeight:"1",marginBottom:"4px"});
+  tScore.innerHTML=`${pct}<span style="font-size:20px">%</span>`;
+  tL.appendChild(tScore);
+  tL.appendChild(div({fontFamily:"'Playfair Display',Georgia,serif",fontSize:"19px",color:totLbl.color,marginBottom:"4px"},[totLbl.text]));
+  tL.appendChild(div({fontSize:"11px",color:t.textDim,lineHeight:"1.6"},[totLbl.desc]));
+  totalDiv.appendChild(tL);
+  const tR=div({textAlign:"right"});
+  tR.appendChild(div({fontSize:"9px",color:t.textDim,marginBottom:"3px"},["PUNTOS"]));
+  tR.appendChild(div({fontFamily:"'Playfair Display',Georgia,serif",fontSize:"32px",color:t.text},[String(total)]));
+  tR.appendChild(div({fontSize:"10px",color:t.textDim},[`de ${max}`]));
+  totalDiv.appendChild(tR);
+  inner.appendChild(totalDiv);
+
+  // Reliability badge
+  const relDiv=div({background:rc.color+"15",border:`1px solid ${rc.color}30`,borderRadius:"12px",padding:"12px 18px",marginBottom:"14px",display:"flex",alignItems:"center",gap:"12px"});
+  relDiv.appendChild(div({fontSize:"16px"},[rc.icon]));
+  const relText=div({flex:"1"});
+  relText.appendChild(div({fontSize:"11px",color:rc.color,fontWeight:"600"},[rc.label]));
+  relText.appendChild(div({fontSize:"10px",color:t.textDim,marginTop:"3px"},[rc.msg]));
+  relDiv.appendChild(relText);
+  inner.appendChild(relDiv);
+
+  // Diagnosis
+  const diagDiv=div({background:t.bgCard,border:`1px solid ${rel==="low"?t.border:totLbl.color+"30"}`,borderRadius:"14px",padding:"20px",marginBottom:"18px",borderLeft:`4px solid ${rel==="low"?t.border:totLbl.color}`,opacity:rel==="low"?"0.6":"1"});
+  const diagHead=div({display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"});
+  diagHead.appendChild(div({fontSize:"9px",letterSpacing:"3px",color:rel==="low"?t.textMuted:totLbl.color},["DIAGNÓSTICO"]));
+  if(rel==="low")diagHead.appendChild(div({fontSize:"9px",color:"#d45a5a"},["⚠ No fiable con <4 tests"]));
+  diagDiv.appendChild(diagHead);
+  const diagP=el("p",{style:{fontFamily:"'Playfair Display',Georgia,serif",fontSize:"14px",color:rel==="low"?t.textDim:t.text,lineHeight:"1.7",fontStyle:"italic"}});
+  diagP.textContent=`"${diagText()}"`;
+  diagDiv.appendChild(diagP);
+  inner.appendChild(diagDiv);
+
+  // Test grid
+  const grid=div({display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px",marginBottom:"24px"});
+  activeKeys.forEach(k=>{
+    const isH=k==="deadhang";
+    const done=skippedSrt&&k==="srt"?true:(k==="balance"?(v.balance_r||v.balance_l):(k==="srt"?deductSRT()>0:v[k]));
+    const pres=PRESCRIPTIONS[k];
+    const hi=HEALTH_IMPACT[k];
+    if(!done){
+      const c=div({background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:"13px",padding:"16px",opacity:"0.3"});
+      c.appendChild(div({fontSize:"10px",color:t.textMuted},[TEST_LABELS[k].toUpperCase()]));
+      c.appendChild(div({fontSize:"11px",color:t.textMuted,marginTop:"3px"},["Sin datos"]));
+      grid.appendChild(c);
+      return;
+    }
+    if(skippedSrt&&k==="srt"){
+      const c=div({background:t.bgCard,border:"1px solid #e8a05a30",borderRadius:"13px",padding:"16px"});
+      c.appendChild(div({fontSize:"10px",color:"#e8a05a",marginBottom:"4px"},[TEST_LABELS[k].toUpperCase()]));
+      c.appendChild(div({fontSize:"12px",color:"#e8a05a"},["Limitación funcional"]));
+      c.appendChild(div({fontSize:"9px",color:t.textDim,marginTop:"4px"},["Dato clínicamente registrado"]));
+      grid.appendChild(c);
+      return;
+    }
+    const s=scores[k];const lbl=getLabel(s);
+    const active=activePrescription===k;
+    const c=div({background:t.bgCard,border:`1px solid ${active?pres.color:t.border}`,borderRadius:"13px",padding:"16px",cursor:"pointer",transition:"all 0.2s"});
+    const cHead=div({display:"flex",justifyContent:"space-between",marginBottom:"8px"});
+    cHead.appendChild(div({fontSize:"20px"},[pres.icon]));
+    cHead.appendChild(div({fontFamily:"'Playfair Display',Georgia,serif",fontSize:"32px",color:lbl.color,lineHeight:"1"},[String(s)]));
+    c.appendChild(cHead);
+    const nameEl=div({fontSize:"10px",color:t.textDim,marginBottom:"2px"});
+    let nameText=TEST_LABELS[k].toUpperCase();
+    if(isH)nameText+=" ★";
+    if(k==="pushups"&&pvc)nameText+=` · ${pvc==="knees"?"rodillas":"plancha"}`;
+    nameEl.textContent=nameText;
+    c.appendChild(nameEl);
+    c.appendChild(div({fontSize:"11px",color:lbl.color,marginBottom:"6px"},[lbl.text]));
+    c.appendChild(scoreBars(s,lbl.color));
+    c.appendChild(div({marginTop:"6px",fontSize:"8px",color:t.textMuted,lineHeight:"1.4"},[hi.text.split(".")[0]+"."]));
+    if(k==="balance"&&balAsym&&parseFloat(balAsym)>20)c.appendChild(div({marginTop:"5px",fontSize:"9px",color:"#e8a05a"},[`⚠ Asimetría ${balAsym}%`]));
+    if(s<=2&&!isH)c.appendChild(div({marginTop:"4px",fontSize:"8px",color:pres.color,letterSpacing:"1px"},["⚠ TAP → PLAN DE MEJORA"]));
+    c.addEventListener("click",()=>setState({activePrescription:activePrescription===k?null:k}));
+    grid.appendChild(c);
+  });
+  inner.appendChild(grid);
+
+  // Prescription panel
+  if(activePrescription&&PRESCRIPTIONS[activePrescription]){
+    const pres=PRESCRIPTIONS[activePrescription];
+    const pd=div({background:t.bgCard,border:`1px solid ${pres.color}50`,borderRadius:"18px",padding:"26px",marginBottom:"22px"});
+    const pdHead=div({display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"16px"});
+    const pdHL=div({});
+    pdHL.appendChild(div({fontSize:"9px",letterSpacing:"3px",color:pres.color,marginBottom:"6px"},["PLAN DE MEJORA"]));
+    pdHL.appendChild(h(3,{fontFamily:"'Playfair Display',Georgia,serif",fontSize:"21px",fontWeight:"400",color:t.text},pres.name));
+    pdHead.appendChild(pdHL);
+    pdHead.appendChild(btn({background:"none",border:"none",color:t.textDim,fontSize:"22px"},"×",()=>setState({activePrescription:null})));
+    pd.appendChild(pdHead);
+    const whatDiv=div({background:t.bgInput,borderRadius:"10px",padding:"14px",marginBottom:"16px",borderLeft:`3px solid ${pres.color}`});
+    whatDiv.appendChild(p({fontSize:"11px",color:t.textDim,lineHeight:"1.7"},pres.what));
+    pd.appendChild(whatDiv);
+    pd.appendChild(div({fontSize:"9px",letterSpacing:"3px",color:t.textDim,marginBottom:"10px"},["EJERCICIOS"]));
+    pres.exercises.forEach((ex,i)=>{
+      const exDiv=div({background:t.bgInput,borderRadius:"10px",padding:"14px",marginBottom:"8px"});
+      const exRow=div({display:"flex",gap:"10px",marginBottom:"6px"});
+      exRow.appendChild(div({fontFamily:"'Playfair Display',Georgia,serif",fontSize:"18px",color:pres.color,minWidth:"24px"},[String(i+1)]));
+      const exRight=div({});
+      exRight.appendChild(div({fontSize:"12px",fontFamily:"'Playfair Display',Georgia,serif",color:t.text,marginBottom:"5px"},[ex.name]));
+      const tags=div({display:"flex",gap:"6px",flexWrap:"wrap"});
+      [["Series",ex.sets],["Reps",ex.reps],["Carga",ex.load]].forEach(([l,val])=>{
+        const tag=div({background:t.bgCard,borderRadius:"5px",padding:"3px 8px"});
+        tag.appendChild(span({fontSize:"9px",color:t.textMuted},`${l}: `));
+        tag.appendChild(span({fontSize:"10px",color:t.textDim},val));
+        tags.appendChild(tag);
+      });
+      exRight.appendChild(tags);
+      exRow.appendChild(exRight);
+      exDiv.appendChild(exRow);
+      exDiv.appendChild(div({fontSize:"10px",color:t.textDim,lineHeight:"1.5",paddingLeft:"34px"},[ex.note]));
+      pd.appendChild(exDiv);
+    });
+    const pgrid=div({display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginTop:"4px"});
+    [["FRECUENCIA",pres.frequency],["PROGRESIÓN",pres.progression]].forEach(([k2,val])=>{
+      const pg=div({background:t.bgInput,borderRadius:"10px",padding:"12px"});
+      pg.appendChild(div({fontSize:"9px",letterSpacing:"2px",color:t.textDim,marginBottom:"5px"},[k2]));
+      pg.appendChild(div({fontSize:"10px",color:t.text,lineHeight:"1.6"},[val]));
+      pgrid.appendChild(pg);
+    });
+    pd.appendChild(pgrid);
+    inner.appendChild(pd);
+  }
+
+  // Priority list
+  if(priorityTests.length>0){
+    const prioDiv=div({background:t.bgCard,border:`1px solid ${t.border}`,borderRadius:"18px",padding:"26px",marginBottom:"22px"});
+    prioDiv.appendChild(div({fontSize:"9px",letterSpacing:"3px",color:t.accent,marginBottom:"14px"},["PRIORIDADES DE ENTRENAMIENTO"]));
+    priorityTests.forEach((k,i)=>{
+      const s=scores[k];const lbl=getLabel(s);const pres=PRESCRIPTIONS[k];
+      const row=div({display:"grid",gridTemplateColumns:"26px 1fr auto auto",gap:"12px",alignItems:"center",padding:"9px 0",borderBottom:i<priorityTests.length-1?`1px solid ${t.border}`:"none"});
+      row.appendChild(div({fontFamily:"'Playfair Display',Georgia,serif",fontSize:"18px",color:t.border},[String(i+1)]));
+      const rL=div({});
+      rL.appendChild(div({fontSize:"12px",fontFamily:"'Playfair Display',Georgia,serif",color:t.text},[`${pres.icon} ${TEST_LABELS[k]}`]));
+      if(s<=2)rL.appendChild(div({fontSize:"9px",color:"#e8a05a",marginTop:"1px"},["⚠ DÉFICIT SIGNIFICATIVO"]));
+      row.appendChild(rL);
+      row.appendChild(div({fontFamily:"'Playfair Display',Georgia,serif",fontSize:"24px",color:lbl.color},[String(s)]));
+      row.appendChild(btn({background:pres.color+"20",border:`1px solid ${pres.color}50`,borderRadius:"7px",padding:"4px 10px",color:pres.color,fontSize:"10px"},"VER PLAN",()=>{setState({activePrescription:k});window.scrollTo({top:9999,behavior:"smooth"});}));
+      prioDiv.appendChild(row);
+    });
+    inner.appendChild(prioDiv);
+  }
+
+  // Actions
+  const actRow=div({display:"flex",gap:"10px"});
+  actRow.appendChild(btn({flex:"1",background:"transparent",border:`1px solid ${t.border}`,borderRadius:"12px",padding:"12px",color:t.textDim,fontSize:"11px"},"← Editar resultados",()=>setState({step:"tests"})));
+  actRow.appendChild(btn({flex:"1",background:t.btnPrimary,border:"none",borderRadius:"12px",padding:"12px",color:t.btnPrimaryText,fontSize:"12px",letterSpacing:"2px"},"NUEVO CLIENTE",()=>setState({step:"setup",name:"",age:"",ageBand:null,activity:null,gender:null,values:{grip:"",chair:"",pushups:"",balance_r:"",balance_l:"",srt:"",cooper:"",deadhang:""},srtDown:{hand:0,knee:0,forearm:0,balance:0},srtUp:{hand:0,knee:0,forearm:0,balance:0},skippedSrt:false,hangEnabled:false,pushupsVariant:null,activeTest:"grip",activePrescription:null,hangRunning:false,hangElapsed:0})));
+  inner.appendChild(actRow);
+
+  wrap.appendChild(inner);
+  return wrap;
+}
+
+// ─── BALANCE INPUT ────────────────────────────────────────────────────────────
+function balanceInputEl(t,eyesClosed,scores,atLbl){
+  const{values:v,ageBand:ab,gender:g}=state;
+  const balV=getBalV(ab,state.activity);
+  const br=v.balance_r?scoreBalance(v.balance_r,ab,g,eyesClosed):5;
+  const bl=v.balance_l?scoreBalance(v.balance_l,ab,g,eyesClosed):5;
+  const balScore=(v.balance_r||v.balance_l)?Math.min(br,bl):0;
+  const lbl=balScore?getLabel(balScore):null;
+  const asym=getBalAsym();
+
+  const wrap=div({background:t.bgCard,border:"1px solid #8ab4d440",borderRadius:"14px",padding:"20px",marginBottom:"14px"});
+  wrap.appendChild(div({fontSize:"9px",letterSpacing:"3px",color:t.textDim,marginBottom:"12px"},[`RESULTADO · ${eyesClosed?"OJOS CERRADOS":"OJOS ABIERTOS"} · AMBAS PIERNAS`]));
+  const grid=div({display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px"});
+  [["Pierna derecha","balance_r"],["Pierna izquierda","balance_l"]].forEach(([label,key])=>{
+    const col=div({});
+    col.appendChild(div({fontSize:"9px",color:t.textDim,marginBottom:"6px",textAlign:"center"},[label.toUpperCase()]));
+    const inp2=inp({width:"100%",background:t.bgInput,border:"1px solid #8ab4d460",borderRadius:"10px",padding:"12px",color:t.text,fontSize:"26px",textAlign:"center",boxSizing:"border-box"},{type:"number",value:v[key]||"",placeholder:"seg"});
+    inp2.addEventListener("input",e=>{const vals={...state.values};vals[key]=e.target.value;setState({values:vals});});
+    col.appendChild(inp2);
+    grid.appendChild(col);
+  });
+  wrap.appendChild(grid);
+  if(balScore>0&&lbl){
+    const sRow=div({display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"});
+    sRow.appendChild(div({fontSize:"10px",color:t.textDim},["Puntuación · peor pierna"]));
+    const sNum=div({fontFamily:"'Playfair Display',Georgia,serif",fontSize:"26px",color:lbl.color});
+    sNum.innerHTML=`${balScore} <span style="font-size:11px">${lbl.text}</span>`;
+    sRow.appendChild(sNum);
+    wrap.appendChild(sRow);
+    wrap.appendChild(scoreBars(balScore,lbl.color));
+    if(asym){
+      const asymDiv=div({background:parseFloat(asym)>20?"#e8a05a15":t.bgInput,border:`1px solid ${parseFloat(asym)>20?"#e8a05a40":t.border}`,borderRadius:"8px",padding:"8px 12px",fontSize:"10px",color:parseFloat(asym)>20?"#e8a05a":t.textDim,marginTop:"8px"});
+      asymDiv.textContent=parseFloat(asym)>20?`⚠ Asimetría significativa: ${asym}% — trabajar en el plan`:`Asimetría: ${asym}% — dentro del rango normal (<20%)`;
+      wrap.appendChild(asymDiv);
+    }
+  }
+  return wrap;
+}
+
+// ─── HANG TIMER ──────────────────────────────────────────────────────────────
+function hangTimerEl(t,score,lbl){
+  const{hangRunning,hangElapsed,values:v}=state;
+  const display=hangRunning?hangElapsed.toFixed(1):(v.deadhang||"0.0");
+
+  const wrap=div({background:t.bgCard,border:"1px solid #5ad4c840",borderRadius:"14px",padding:"22px",marginBottom:"14px"});
+  wrap.appendChild(div({fontSize:"9px",letterSpacing:"3px",color:t.textDim,marginBottom:"14px"},["CRONÓMETRO · DEAD HANG"]));
+  const display2=div({textAlign:"center",marginBottom:"18px"});
+  const num=div({fontFamily:"'Playfair Display',Georgia,serif",fontSize:"60px",color:hangRunning?t.text:(lbl?lbl.color:t.textDim),lineHeight:"1",transition:"color 0.3s"});
+  num.textContent=display;
+  display2.appendChild(num);
+  display2.appendChild(div({fontFamily:"monospace",fontSize:"12px",color:t.textDim,marginTop:"4px"},["segundos"]));
+  if(lbl&&!hangRunning)display2.appendChild(div({fontFamily:"monospace",fontSize:"11px",color:lbl.color,marginTop:"6px",letterSpacing:"1px"},[lbl.text.toUpperCase()]));
+  wrap.appendChild(display2);
+
+  const btnRow=div({display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"10px",marginBottom:"10px"});
+  if(!hangRunning){
+    const startB=btn({gridColumn:"1/3",background:"#5ad4c8",border:"none",borderRadius:"10px",padding:"14px",color:"#111827",fontSize:"13px",letterSpacing:"1px"},"▶ INICIAR",()=>{
+      const timer=setInterval(()=>{
+        state.hangElapsed=+(state.hangElapsed+0.1).toFixed(1);
+        render();
+      },100);
+      setState({hangRunning:true,hangElapsed:0,hangTimer:timer,values:{...state.values,deadhang:""}});
+    });
+    startB.style.gridColumn="1/3";
+    btnRow.appendChild(startB);
+  } else {
+    const stopB=btn({background:"#d45a5a",border:"none",borderRadius:"10px",padding:"14px",color:"#fff",fontSize:"13px",letterSpacing:"1px"},"■ PARAR",()=>{
+      clearInterval(state.hangTimer);
+      const val=state.hangElapsed.toFixed(1);
+      setState({hangRunning:false,hangTimer:null,values:{...state.values,deadhang:val}});
+    });
+    stopB.style.gridColumn="1/3";
+    btnRow.appendChild(stopB);
+  }
+  btnRow.appendChild(btn({background:t.bgInput,border:`1px solid ${t.border}`,borderRadius:"10px",padding:"14px",color:t.textDim,fontSize:"14px"},"↺",()=>{
+    clearInterval(state.hangTimer);
+    setState({hangRunning:false,hangElapsed:0,hangTimer:null,values:{...state.values,deadhang:""}});
+  }));
+  wrap.appendChild(btnRow);
+  if(lbl&&!hangRunning)wrap.appendChild(scoreBars(score,lbl.color));
+  wrap.appendChild(div({marginTop:"10px",fontSize:"9px",color:t.textMuted,textAlign:"center"},["START al colgarse · STOP al soltar la barra"]));
+  return wrap;
+}
+
+// ─── SRT CALCULATOR ──────────────────────────────────────────────────────────
+function srtCalcEl(t){
+  const{srtDown:d,srtUp:u,ageBand:ab}=state;
+  const deduct=s=>s.hand+s.knee+s.forearm+s.balance*0.5;
+  const total=Math.max(0,10-deduct(d)-deduct(u));
+  const thresh=TABLES.srt[ab];
+  const s=thresh?calcScore(total,thresh):0;
+  const lbl=s?getLabel(s):null;
+
+  function updateSRT(phase,field,delta){
+    const max=field==="balance"?1:3;
+    const src=phase==="down"?{...d}:{...u};
+    src[field]=Math.max(0,Math.min(max,src[field]+delta));
+    if(phase==="down")setState({srtDown:src});
+    else setState({srtUp:src});
+  }
+
+  const wrap=div({background:t.bgCard,border:"1px solid #b48ad440",borderRadius:"14px",padding:"18px",marginBottom:"14px"});
+  const head=div({display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"});
+  const hL=div({});
+  hL.appendChild(div({fontSize:"9px",letterSpacing:"3px",color:t.textDim},["CALCULADORA SRT"]));
+  hL.appendChild(div({fontSize:"9px",color:"#e8a05a",marginTop:"3px"},["⚠ PIERNAS CRUZADAS obligatorio"]));
+  head.appendChild(hL);
+  const hR=div({textAlign:"right"});
+  hR.appendChild(div({fontFamily:"'Playfair Display',Georgia,serif",fontSize:"42px",color:lbl?lbl.color:t.textDim,lineHeight:"1"},[total.toFixed(1)]));
+  hR.appendChild(div({fontSize:"9px",color:lbl?lbl.color:t.textDim,letterSpacing:"1px"},[lbl?lbl.text.toUpperCase():"/ 10 PUNTOS"]));
+  head.appendChild(hR);
+  wrap.appendChild(head);
+
+  const grid=div({display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"});
+  [{label:"⬇ AL BAJAR",phase:"down",state2:d,col:"#c8a45a"},{label:"⬆ AL SUBIR",phase:"up",state2:u,col:"#8ab4d4"}].forEach(({label,phase,state2,col})=>{
+    const col2=div({background:t.bgInput,borderRadius:"10px",padding:"12px"});
+    col2.appendChild(div({fontSize:"9px",letterSpacing:"2px",color:col,marginBottom:"8px"},[label]));
+    [{field:"hand",label:"Mano/s",ded:"−1 c/u"},{field:"knee",label:"Rodilla/s",ded:"−1 c/u"},{field:"forearm",label:"Antebrazo/s",ded:"−1 c/u"},{field:"balance",label:"Pérdida equilibrio",ded:"−0.5"}].forEach(({field,label:rl,ded})=>{
+      const row=div({display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${t.border}`});
+      const rL=div({});
+      rL.appendChild(div({fontSize:"11px",color:t.text},[rl]));
+      rL.appendChild(div({fontSize:"9px",color:t.textMuted},[ded]));
+      row.appendChild(rL);
+      const rR=div({display:"flex",alignItems:"center",gap:"7px"});
+      rR.appendChild(btn({width:"26px",height:"26px",borderRadius:"7px",background:t.bgCard,border:`1px solid ${t.border}`,color:t.text,fontSize:"15px"},"−",()=>updateSRT(phase,field,-1)));
+      rR.appendChild(div({fontFamily:"monospace",fontSize:"17px",color:state2[field]>0?"#d45a5a":t.textMuted,minWidth:"18px",textAlign:"center"},[String(state2[field])]));
+      rR.appendChild(btn({width:"26px",height:"26px",borderRadius:"7px",background:t.bgCard,border:`1px solid ${t.border}`,color:t.text,fontSize:"15px"},"+",()=>updateSRT(phase,field,+1)));
+      row.appendChild(rR);
+      col2.appendChild(row);
+    });
+    col2.appendChild(div({marginTop:"7px",fontSize:"9px",color:t.textDim,textAlign:"right"},[`Penalización: `,span({color:"#d45a5a"},`−${deduct(state2).toFixed(1)}`)]));
+    grid.appendChild(col2);
+  });
+  wrap.appendChild(grid);
+
+  const footer=div({marginTop:"10px",background:t.bgInput,borderRadius:"8px",padding:"9px 14px",display:"flex",justifyContent:"space-between"});
+  footer.appendChild(span({fontSize:"10px",color:t.textDim},`10 − ${(deduct(d)+deduct(u)).toFixed(1)} penalización`));
+  footer.appendChild(span({fontSize:"12px",color:lbl?lbl.color:t.accent},`= ${total.toFixed(1)} puntos`));
+  wrap.appendChild(footer);
+  if(lbl)wrap.appendChild(div({marginTop:"8px"},[scoreBars(s,lbl.color)]));
+  return wrap;
+}
+
+// ─── FIELD + SLABEL + CHOICECARD HELPERS ─────────────────────────────────────
+function fieldEl(t,label,value,placeholder,type,onChange){
+  const wrap=div({});
+  const lbl=div({fontSize:"9px",letterSpacing:"3px",color:t.textDim,marginBottom:"8px"},[label.toUpperCase()]);
+  wrap.appendChild(lbl);
+  const input=inp({width:"100%",background:t.bgInput,border:`1px solid ${t.border}`,borderRadius:"9px",padding:"10px 14px",color:t.text,fontSize:"13px",boxSizing:"border-box"},{type,value,placeholder});
+  input.addEventListener("input",e=>onChange(e.target.value));
+  wrap.appendChild(input);
+  return wrap;
+}
+function sLabelEl(t,text){
+  return div({fontSize:"9px",letterSpacing:"3px",color:t.textDim,marginBottom:"8px"},[text.toUpperCase()]);
+}
+function choiceCardEl(t,icon,title,desc,color,active,onClick){
+  const c=div({background:active?color+"1a":t.bgInput,border:`1px solid ${active?color:t.border}`,borderRadius:"11px",padding:"14px 16px",cursor:"pointer",transition:"all 0.15s"});
+  c.appendChild(div({fontSize:"22px",marginBottom:"6px"},[icon]));
+  c.appendChild(div({fontSize:"13px",color:active?color:t.text,marginBottom:"3px"},[title]));
+  if(desc)c.appendChild(div({fontSize:"10px",color:t.textDim,lineHeight:"1.5"},[desc]));
+  c.addEventListener("click",onClick);
+  return c;
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function render(){
+  const t=T();
+  document.body.style.background=t.bg;
+  document.body.style.color=t.text;
+  const app=document.getElementById("app");
+  app.innerHTML="";
+  app.appendChild(themeSwitcher());
+  if(state.step==="setup")app.appendChild(setupScreen());
+  else if(state.step==="tests")app.appendChild(testsScreen());
+  else if(state.step==="results")app.appendChild(resultsScreen());
+}
+
+render();
+</script>
+</body>
+</html>
