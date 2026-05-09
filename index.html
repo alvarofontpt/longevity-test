@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -18,6 +19,17 @@ input{font-family:monospace;outline:none;transition:all 0.15s}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .flex{display:flex;gap:10px}
 .bar{height:5px;border-radius:3px;transition:background 0.3s}
+
+@media print {
+  body{background:#fff!important;color:#000!important;}
+  #theme-switcher{display:none!important;}
+  .no-print{display:none!important;}
+  #print-area{display:block!important;}
+  .sidebar{display:none!important;}
+  button{display:none!important;}
+  @page{margin:1.5cm;size:A4;}
+}
+#print-area{display:none;}
 </style>
 </head>
 <body>
@@ -127,9 +139,13 @@ function getSrtV(ab,act){
 }
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
+const PWD="6077";
+
 const state={
   themeKey:"slate",
-  step:"setup",
+  step:"login",
+  loginInput:"",
+  loginError:false,
   name:"",age:"",ageBand:null,activity:null,gender:null,
   values:{grip:"",chair:"",pushups:"",balance_r:"",balance_l:"",srt:"",cooper:"",deadhang:""},
   srtDown:{hand:0,knee:0,forearm:0,balance:0},
@@ -761,6 +777,10 @@ function resultsScreen(){
     inner.appendChild(prioDiv);
   }
 
+  // PDF Button
+  const pdfBtn=btn({width:"100%",background:"#3dd6a3",border:"none",borderRadius:"12px",padding:"14px",color:"#111827",fontSize:"13px",letterSpacing:"1px",marginBottom:"10px"},"📄 Guardar PDF / Compartir",()=>generatePDF());
+  inner.appendChild(pdfBtn);
+
   // Actions
   const actRow=div({display:"flex",gap:"10px"});
   actRow.appendChild(btn({flex:"1",background:"transparent",border:`1px solid ${t.border}`,borderRadius:"12px",padding:"12px",color:t.textDim,fontSize:"11px"},"← Editar resultados",()=>setState({step:"tests"})));
@@ -936,13 +956,216 @@ function choiceCardEl(t,icon,title,desc,color,active,onClick){
   return c;
 }
 
+// ─── LOGIN SCREEN ────────────────────────────────────────────────────────────
+function loginScreen(){
+  const t=THEMES["slate"];
+  const wrap=document.createElement("div");
+  wrap.style.cssText="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#151c2c;";
+
+  const card=document.createElement("div");
+  card.style.cssText="max-width:360px;width:100%;background:#1e2535;border:1px solid #2d3748;border-radius:20px;padding:40px 32px;text-align:center;";
+
+  // Logo / title
+  const logo=document.createElement("div");
+  logo.style.cssText="font-size:10px;letter-spacing:5px;color:#3dd6a3;margin-bottom:20px;font-family:monospace;";
+  logo.textContent="ACCESO PROFESIONAL";
+  card.appendChild(logo);
+
+  const h1=document.createElement("h1");
+  h1.style.cssText="font-family:'Playfair Display',Georgia,serif;font-size:28px;font-weight:400;color:#e2e8f0;margin-bottom:8px;line-height:1.2;";
+  h1.innerHTML='Evaluación Física<br><em style="color:#3dd6a3">Funcional</em>';
+  card.appendChild(h1);
+
+  const sub=document.createElement("p");
+  sub.style.cssText="font-size:11px;color:#718096;margin-bottom:32px;font-family:monospace;";
+  sub.textContent="Introduce la contraseña para acceder";
+  card.appendChild(sub);
+
+  // Input
+  const inp2=document.createElement("input");
+  inp2.type="password";
+  inp2.placeholder="Contraseña";
+  inp2.value=state.loginInput||"";
+  inp2.style.cssText="width:100%;background:#111827;border:1px solid "+(state.loginError?"#d45a5a":"#2d3748")+";border-radius:12px;padding:16px;color:#e2e8f0;font-size:20px;font-family:monospace;text-align:center;margin-bottom:12px;box-sizing:border-box;letter-spacing:8px;outline:none;";
+  inp2.addEventListener("input",e=>{state.loginInput=e.target.value;state.loginError=false;render();});
+  inp2.addEventListener("keydown",e=>{if(e.key==="Enter")tryLogin();});
+  card.appendChild(inp2);
+
+  // Error msg
+  if(state.loginError){
+    const err=document.createElement("div");
+    err.style.cssText="font-size:11px;color:#d45a5a;margin-bottom:12px;font-family:monospace;";
+    err.textContent="Contraseña incorrecta. Inténtalo de nuevo.";
+    card.appendChild(err);
+  }
+
+  // Button
+  const btn2=document.createElement("button");
+  btn2.textContent="ENTRAR →";
+  btn2.style.cssText="width:100%;background:#3dd6a3;color:#111827;border:none;border-radius:12px;padding:16px;font-size:13px;font-family:monospace;letter-spacing:2px;cursor:pointer;";
+  btn2.addEventListener("click",tryLogin);
+  card.appendChild(btn2);
+
+  wrap.appendChild(card);
+  return wrap;
+}
+
+function tryLogin(){
+  if(state.loginInput===PWD){
+    state.step="setup";
+    state.loginError=false;
+    render();
+  } else {
+    state.loginError=true;
+    render();
+    // Focus input after render
+    setTimeout(()=>{const i=document.querySelector("input[type=password]");if(i){i.focus();i.select();}},50);
+  }
+}
+
+// ─── PDF / PRINT ─────────────────────────────────────────────────────────────
+function generatePDF(){
+  const{name,age,ageBand,activity,gender,values:v,pushupsVariant:pvc,skippedSrt}=state;
+  const bandInfo=AGE_BANDS.find(b=>b.id===ageBand);
+  const scores=getScores();
+  const activeKeys=getActiveKeys();
+  const{pct,total,max,scoredKeys}=getPct();
+  const totLbl=getTotalLabel(pct);
+  const balAsym=getBalAsym();
+  const date=new Date().toLocaleDateString("es-ES",{day:"2-digit",month:"long",year:"numeric"});
+
+  const baseCompleted=scoredKeys.filter(k=>k!=="deadhang").length;
+  const rel=baseCompleted>=4?"Resultado válido":baseCompleted===3?"Resultado parcial":"Resultado no representativo";
+
+  let rows="";
+  activeKeys.forEach(k=>{
+    const pres=PRESCRIPTIONS[k];
+    const done=skippedSrt&&k==="srt"?true:(k==="balance"?(v.balance_r||v.balance_l):(k==="srt"?deductSRT()>0:v[k]));
+    if(!done){rows+=`<tr><td>${pres.icon} ${TEST_LABELS[k]}</td><td colspan="3" style="color:#999;">Sin datos</td></tr>`;return;}
+    if(skippedSrt&&k==="srt"){rows+=`<tr><td>${pres.icon} ${TEST_LABELS[k]}</td><td colspan="3" style="color:#e8a05a;">Limitación funcional registrada</td></tr>`;return;}
+    const s=scores[k];
+    const lbl=getLabel(s);
+    let val="";
+    if(k==="balance")val=`D:${v.balance_r||"—"}s / I:${v.balance_l||"—"}s${balAsym?` · Asimetría ${balAsym}%`:""}`;
+    else if(k==="srt")val=`${deductSRT().toFixed(1)} puntos`;
+    else if(k==="pushups")val=`${v[k]} rep${pvc?` (${pvc==="knees"?"rodillas":"plancha"})`:""}`;
+    else if(k==="grip")val=`${v[k]} kg`;
+    else if(k==="chair")val=`${v[k]} rep`;
+    else if(k==="cooper")val=`${v[k]} metros`;
+    else if(k==="deadhang")val=`${v[k]} seg`;
+    const bars=`<span style="color:${lbl.color};">${"●".repeat(s)}${"○".repeat(5-s)}</span>`;
+    rows+=`<tr><td>${pres.icon} ${TEST_LABELS[k]}</td><td style="color:${lbl.color};font-weight:bold;">${s}/5 ${lbl.text}</td><td>${val}</td><td>${bars}</td></tr>`;
+  });
+
+  // Priority list
+  const priorityTests=activeKeys
+    .filter(k=>!skippedSrt||(k!=="srt"))
+    .filter(k=>k==="balance"?(v.balance_r||v.balance_l):(k==="srt"?deductSRT()>0:v[k]))
+    .sort((a,b)=>scores[a]-scores[b]);
+  const deficits=priorityTests.filter(k=>scores[k]<=2).map(k=>`${PRESCRIPTIONS[k].icon} ${TEST_LABELS[k]}`);
+  const strong=priorityTests.filter(k=>scores[k]>=4).map(k=>`${PRESCRIPTIONS[k].icon} ${TEST_LABELS[k]}`);
+
+  const html=`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Evaluación — ${name||"Cliente"}</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:monospace;background:#f5f2ee;color:#1a1a1a;padding:32px;max-width:760px;margin:0 auto;}
+.header{border-bottom:3px solid #3dd6a3;padding-bottom:20px;margin-bottom:24px;}
+.brand{font-size:9px;letter-spacing:5px;color:#3dd6a3;margin-bottom:8px;}
+h1{font-family:'Playfair Display',Georgia,serif;font-size:32px;font-weight:400;color:#1a1a1a;margin-bottom:4px;}
+.meta{font-size:11px;color:#6a6050;margin-top:4px;}
+.score-box{background:#1e2535;color:#e2e8f0;border-radius:12px;padding:20px 24px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;}
+.score-pct{font-family:'Playfair Display',Georgia,serif;font-size:48px;line-height:1;}
+.score-label{font-family:'Playfair Display',Georgia,serif;font-size:18px;margin-top:4px;}
+.score-desc{font-size:11px;color:#718096;margin-top:4px;max-width:340px;}
+.score-pts{text-align:right;}
+.score-pts .num{font-family:'Playfair Display',Georgia,serif;font-size:32px;}
+.score-pts .sub{font-size:10px;color:#718096;}
+.reliability{font-size:10px;color:#4a5568;background:#e8e4dc;border-radius:8px;padding:8px 12px;margin-bottom:20px;}
+table{width:100%;border-collapse:collapse;margin-bottom:20px;}
+th{text-align:left;font-size:9px;letter-spacing:2px;color:#6a6050;border-bottom:2px solid #ddd9d0;padding:8px 10px;}
+td{padding:10px;border-bottom:1px solid #e8e4dc;font-size:12px;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.section-title{font-size:9px;letter-spacing:3px;color:#4a7c6f;margin-bottom:10px;margin-top:20px;}
+.diag{background:#fff;border-left:4px solid #3dd6a3;border-radius:0 8px 8px 0;padding:14px 16px;margin-bottom:20px;font-family:'Playfair Display',Georgia,serif;font-size:13px;font-style:italic;line-height:1.7;color:#1a1a1a;}
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
+.pill{background:#1e2535;color:#e2e8f0;border-radius:20px;padding:4px 12px;font-size:11px;}
+.pill.red{background:#d45a5a20;color:#d45a5a;border:1px solid #d45a5a40;}
+.pill.green{background:#5ab87a20;color:#2d8a52;border:1px solid #5ab87a40;}
+.footer{margin-top:28px;border-top:1px solid #ddd9d0;padding-top:14px;font-size:9px;color:#b0a898;display:flex;justify-content:space-between;}
+@media print{body{padding:0;}@page{margin:1.5cm;size:A4;}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="brand">EVALUACIÓN FÍSICA FUNCIONAL</div>
+  <h1>${name||"Cliente"}</h1>
+  <div class="meta">${age} años · ${bandInfo?.desc} (${bandInfo?.label}) · ${activity==="active"?"Activo":"Sedentario"} · ${gender==="m"?"Hombre":"Mujer"} · ${date}</div>
+</div>
+
+<div class="score-box">
+  <div>
+    <div class="score-pct" style="color:${totLbl.color};">${pct}%</div>
+    <div class="score-label" style="color:${totLbl.color};">${totLbl.text}</div>
+    <div class="score-desc">${totLbl.desc}</div>
+  </div>
+  <div class="score-pts">
+    <div class="num">${total}</div>
+    <div class="sub">de ${max} puntos</div>
+    <div class="sub" style="margin-top:4px;">${rel}</div>
+  </div>
+</div>
+
+${deficits.length>0||strong.length>0?`
+<div class="section-title">RESUMEN</div>
+${strong.length>0?`<p style="font-size:11px;color:#6a6050;margin-bottom:6px;">✅ Puntos fuertes:</p><div class="pills">${strong.map(s=>`<span class="pill green">${s}</span>`).join("")}</div>`:""}
+${deficits.length>0?`<p style="font-size:11px;color:#6a6050;margin-bottom:6px;margin-top:8px;">⚠️ Prioridades de entrenamiento:</p><div class="pills">${deficits.map(d=>`<span class="pill red">${d}</span>`).join("")}</div>`:""}
+`:""}
+
+<div class="section-title" style="margin-top:20px;">RESULTADOS POR TEST</div>
+<table>
+  <thead><tr><th>TEST</th><th>PUNTUACIÓN</th><th>RESULTADO</th><th>NIVEL</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+
+<div class="footer">
+  <span>Evaluación Física Funcional · longevity-test.vercel.app</span>
+  <span>${date}</span>
+</div>
+</body>
+</html>`;
+
+  // Open in new window and print
+  const win=window.open("","_blank","width=800,height=900");
+  win.document.write(html);
+  win.document.close();
+  win.onload=()=>{
+    setTimeout(()=>{
+      win.print();
+    },500);
+  };
+}
+
 // ─── RENDER ───────────────────────────────────────────────────────────────────
 function render(){
+  const app=document.getElementById("app");
+  app.innerHTML="";
+  if(state.step==="login"){
+    document.body.style.background="#151c2c";
+    document.body.style.color="#e2e8f0";
+    app.appendChild(loginScreen());
+    // Auto focus password input
+    setTimeout(()=>{const i=document.querySelector("input[type=password]");if(i)i.focus();},50);
+    return;
+  }
   const t=T();
   document.body.style.background=t.bg;
   document.body.style.color=t.text;
-  const app=document.getElementById("app");
-  app.innerHTML="";
   app.appendChild(themeSwitcher());
   if(state.step==="setup")app.appendChild(setupScreen());
   else if(state.step==="tests")app.appendChild(testsScreen());
