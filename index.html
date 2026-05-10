@@ -65,6 +65,7 @@ const T=()=>THEMES[TK];
 // DATA
 // ═══════════════════════════════════════════════════════════
 const PWD="6077";
+const SHEETS_URL="https://script.google.com/macros/s/AKfycbyGeFvqg-5d4yDRNht7YjpE5nPN41sMUEQwEDzAi8GoFHADIox7qEVmRTuHxn8UaxcOyQ/exec";
 const AGE_BANDS=[
   {id:"u35",label:"18–35",desc:"Joven",color:"#5ab87a"},
   {id:"36_50",label:"36–50",desc:"Adulto",color:"#c8a45a"},
@@ -138,6 +139,10 @@ function getTotLabel(pct){
 // ═══════════════════════════════════════════════════════════
 const S={
   screen:"login", // login | setup | tests | results
+  saving:false,
+  saved:false,
+  saveError:false,
+  notas:"",
   loginErr:false,
   // setup
   name:"",age:"",ageBand:null,activity:null,gender:null,hangEnabled:false,
@@ -422,7 +427,21 @@ function setupScreen(){
 // ═══════════════════════════════════════════════════════════
 function testsScreen(){
   const t_=T();
-  const{ageBand:ab,activity:act,gender:g,activeTest:at,pushupsVariant:pv,balanceVariant:bv,cooperVariant:cv,skippedSrt}=S;
+  const{ageBand:ab,activity:act,gender:g,activeTest:at,skippedSrt}=S;
+  // Auto-suggest variants if not set
+  if(!S.pushupsVariant){
+    if(ab==="over75"||(ab==="66_75")||(ab==="51_65"&&act==="sedentary"))S.pushupsVariant="knees";
+    else S.pushupsVariant="full";
+  }
+  if(!S.balanceVariant){
+    if(ab==="u35"||ab==="36_50"||(ab==="51_65"&&act==="active"))S.balanceVariant="closed";
+    else S.balanceVariant="open";
+  }
+  if(!S.cooperVariant){
+    if(ab==="u35"||ab==="36_50"||(ab==="51_65"&&act==="active"))S.cooperVariant="run";
+    else S.cooperVariant="walk";
+  }
+  const pv=S.pushupsVariant,bv=S.balanceVariant,cv=S.cooperVariant;
   const band=AGE_BANDS.find(b=>b.id===ab);
   const scores=getScores();
   const keys=activeKeys();
@@ -1043,6 +1062,30 @@ function resultsScreen(){
     inner.appendChild(prioDiv);
   }
 
+  // Notas field
+  const notasWrap=d({background:t_.bgCard,border:`1px solid ${t_.border}`,borderRadius:"14px",padding:"18px",marginBottom:"14px"});
+  notasWrap.appendChild(d({fontSize:"9px",letterSpacing:"3px",color:t_.textDim,marginBottom:"10px"},["NOTAS DEL ENTRENADOR (opcional)"]));
+  const notasInp=e("textarea",{style:{width:"100%",background:t_.bgInput,border:`1px solid ${t_.border}`,borderRadius:"10px",padding:"12px",color:t_.text,fontSize:"13px",fontFamily:"monospace",resize:"vertical",minHeight:"80px",boxSizing:"border-box"}});
+  notasInp.value=S.notas||"";
+  notasInp.placeholder="Observaciones de la sesión...";
+  notasInp.addEventListener("input",ev=>{S.notas=ev.target.value;});
+  notasWrap.appendChild(notasInp);
+  inner.appendChild(notasWrap);
+
+  // Save to Sheets button
+  const saveBtn=d({marginBottom:"10px"});
+  if(S.saving){
+    saveBtn.appendChild(btn({width:"100%",background:t_.bgInput,border:`1px solid ${t_.border}`,borderRadius:"12px",padding:"13px",color:t_.textDim,fontSize:"13px"},"⏳ Guardando...",()=>{}));
+  } else if(S.saved){
+    saveBtn.appendChild(btn({width:"100%",background:"#5ab87a20",border:"1px solid #5ab87a40",borderRadius:"12px",padding:"13px",color:"#5ab87a",fontSize:"13px"},"✅ Guardado en Google Sheets",()=>{}));
+  } else if(S.saveError){
+    const errBtn=btn({width:"100%",background:"#d45a5a20",border:"1px solid #d45a5a40",borderRadius:"12px",padding:"13px",color:"#d45a5a",fontSize:"13px"},"⚠ Error al guardar — reintentar",()=>saveToSheets(scores,keys));
+    saveBtn.appendChild(errBtn);
+  } else {
+    saveBtn.appendChild(btn({width:"100%",background:"#5ab87a",border:"none",borderRadius:"12px",padding:"13px",color:"#fff",fontSize:"13px",letterSpacing:"1px"},"💾 Guardar en Google Sheets",()=>saveToSheets(scores,keys)));
+  }
+  inner.appendChild(saveBtn);
+
   // PDF Button
   inner.appendChild(btn({width:"100%",background:t_.accentBg,border:`1px solid ${t_.accentBorder}`,borderRadius:"12px",padding:"13px",color:t_.accent,fontSize:"13px",marginBottom:"10px"},"📄 Guardar PDF / Compartir",()=>generatePDF(scores,keys,date,band)));
 
@@ -1050,7 +1093,7 @@ function resultsScreen(){
   const actRow=d({display:"flex",gap:"10px"});
   actRow.appendChild(btn({flex:"1",background:"transparent",border:`1px solid ${t_.border}`,borderRadius:"12px",padding:"11px",color:t_.textDim,fontSize:"11px"},"← Editar",()=>{S.screen="tests";render();}));
   actRow.appendChild(btn({flex:"1",background:t_.btn,border:"none",borderRadius:"12px",padding:"11px",color:t_.btnText,fontSize:"12px",letterSpacing:"2px"},"NUEVO CLIENTE",()=>{
-    Object.assign(S,{screen:"setup",name:"",age:"",ageBand:null,activity:null,gender:null,hangEnabled:false,activeTest:"grip",pushupsVariant:null,balanceVariant:null,cooperVariant:null,skippedSrt:false,grip:"",chair:"",pushups:"",balR:"",balL:"",srtDown:{hand:0,knee:0,forearm:0,bal:0},srtUp:{hand:0,knee:0,forearm:0,bal:0},cooper:"",deadhang:"",activePres:null});
+    Object.assign(S,{screen:"setup",name:"",age:"",ageBand:null,activity:null,gender:null,hangEnabled:false,activeTest:"grip",pushupsVariant:null,balanceVariant:null,cooperVariant:null,skippedSrt:false,grip:"",chair:"",pushups:"",balR:"",balL:"",srtDown:{hand:0,knee:0,forearm:0,bal:0},srtUp:{hand:0,knee:0,forearm:0,bal:0},cooper:"",deadhang:"",activePres:null,saving:false,saved:false,saveError:false,notas:""});
     render();
   }));
   inner.appendChild(actRow);
@@ -1120,6 +1163,53 @@ ${strong.length>0||deficits.length>0?`<div class="sec">RESUMEN</div>${strong.len
   document.body.appendChild(a);
   a.click();
   setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SAVE TO GOOGLE SHEETS
+// ═══════════════════════════════════════════════════════════
+function saveToSheets(scores,keys){
+  const{pct,total,max,scored}=getPct();
+  const totLbl=getTotLabel(pct);
+  const{pushupsVariant:pv,cooperVariant:cv,balanceVariant:bv,skippedSrt}=S;
+  const date=new Date().toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric"});
+
+  const data={
+    fecha:date,
+    nombre:S.name||"",
+    grip_kg:S.grip||"",
+    grip_pts:scores.grip||"",
+    chair_rep:S.chair||"",
+    chair_pts:scores.chair||"",
+    pushups_rep:S.pushups||"",
+    pushups_variante:pv==="knees"?"Rodillas":"Plancha completa",
+    pushups_pts:scores.pushups||"",
+    balance_r_seg:S.balR||"",
+    balance_l_seg:S.balL||"",
+    balance_variante:bv==="closed"?"Ojos cerrados":"Ojos abiertos",
+    balance_pts:scores.balance||"",
+    srt_pts_raw:srtTotal().toFixed(1),
+    srt_pts:skippedSrt?"Limitación funcional":(scores.srt||""),
+    cooper_metros:S.cooper||"",
+    cooper_variante:cv==="walk"?"6min caminando":"12min corriendo",
+    cooper_pts:scores.cooper||"",
+    deadhang_seg:S.deadhang||"",
+    deadhang_pts:scores.deadhang||"",
+    puntuacion_global:pct+"%",
+    resultado:totLbl.text,
+    notas:S.notas||"",
+  };
+
+  S.saving=true;S.saved=false;S.saveError=false;render();
+
+  fetch(SHEETS_URL,{
+    method:"POST",
+    mode:"no-cors",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(data),
+  })
+  .then(()=>{S.saving=false;S.saved=true;render();})
+  .catch(()=>{S.saving=false;S.saveError=true;render();});
 }
 
 // ═══════════════════════════════════════════════════════════
