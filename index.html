@@ -1234,6 +1234,84 @@ function resultsScreen(){
   }
   inner.appendChild(saveBtn);
 
+  // ── DIAGNÓSTICO DE RIESGO — Solo visible para el entrenador, nunca en PDF ──
+  const riskTests=[
+    {k:"balance",name:"Equilibrio monopodal",
+      risk1:"No superar 10 seg dobla la mortalidad a 7 años.",
+      risk2:"Déficit significativo. Riesgo de caída elevado.",
+      src:"BJSM 2022"},
+    {k:"grip",name:"Dinamometría",
+      risk1:"Cada −5 kg aumenta el riesgo cardiovascular un 17%.",
+      risk2:"Por debajo de P25. Riesgo cardiovascular moderado.",
+      src:"Lancet 2015"},
+    {k:"srt",name:"SRT",
+      risk1:"Puntuación ≤3 asociada a 5× más riesgo de mortalidad.",
+      risk2:"Capacidad funcional reducida. Intervención prioritaria.",
+      src:"Eur J Prev Cardiol 2014"},
+    {k:"cooper",name:"Cooper · VO2max",
+      risk1:"VO2max bajo es el predictor de mortalidad más potente conocido.",
+      risk2:"Capacidad aeróbica por debajo de la media. Riesgo cardiovascular.",
+      src:"Eur Heart J 2018"},
+  ];
+
+  const riskDiv=d({background:t_.bgCard,border:`1px solid ${t_.border}`,borderRadius:"16px",padding:"22px",marginBottom:"18px"});
+  const riskHead=d({display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"});
+  riskHead.appendChild(d({fontSize:"9px",letterSpacing:"3px",color:"#d45a5a"},["ANÁLISIS DE RIESGO — SOLO VISIBLE PARA EL ENTRENADOR"]));
+  riskHead.appendChild(d({fontSize:"9px",color:t_.textDim,background:"#d45a5a20",border:"1px solid #d45a5a40",borderRadius:"6px",padding:"3px 8px"},["No aparece en el PDF"]));
+  riskDiv.appendChild(riskHead);
+
+  riskTests.forEach(rt=>{
+    const done=rt.k==="balance"?(S.balR||S.balL):S[rt.k]||(rt.k==="srt"&&srtTotal()>0);
+    if(!done&&!(skippedSrt&&rt.k==="srt"))return;
+
+    const s=scores[rt.k]||0;
+    let riskColor,riskIcon,riskMsg;
+    if(skippedSrt&&rt.k==="srt"){
+      riskColor="#e8a05a";riskIcon="🟡";riskMsg="Limitación funcional registrada — no evaluable.";
+    } else if(s<=1){
+      riskColor="#d45a5a";riskIcon="🔴";riskMsg=rt.risk1;
+    } else if(s<=2){
+      riskColor="#e8a05a";riskIcon="🟡";riskMsg=rt.risk2;
+    } else {
+      riskColor="#5ab87a";riskIcon="🟢";riskMsg="Sin riesgo destacable en este parámetro.";
+    }
+
+    const row=d({display:"flex",gap:"12px",alignItems:"flex-start",padding:"10px 0",borderBottom:`1px solid ${t_.border}`});
+    row.appendChild(d({fontSize:"18px",flexShrink:"0"},[riskIcon]));
+    const rL=d({flex:"1"});
+    rL.appendChild(d({fontSize:"11px",color:t_.text,fontWeight:"600",marginBottom:"3px"},[rt.name]));
+    rL.appendChild(d({fontSize:"10px",color:riskColor,lineHeight:"1.5",marginBottom:"3px"},[riskMsg]));
+    rL.appendChild(d({fontSize:"8px",color:t_.textMuted,letterSpacing:"1px"},[rt.src]));
+    row.appendChild(rL);
+    const rScore=d({textAlign:"right",flexShrink:"0"});
+    if(!skippedSrt||rt.k!=="srt"){
+      rScore.appendChild(d({fontFamily:"'Playfair Display',Georgia,serif",fontSize:"22px",color:riskColor},[String(s)]));
+      rScore.appendChild(d({fontSize:"8px",color:riskColor,letterSpacing:"1px"},["/5"]));
+    }
+    row.appendChild(rScore);
+    riskDiv.appendChild(row);
+  });
+
+  // Summary line
+  const criticalCount=riskTests.filter(rt=>{
+    if(skippedSrt&&rt.k==="srt")return false;
+    const done=rt.k==="balance"?(S.balR||S.balL):S[rt.k]||(rt.k==="srt"&&srtTotal()>0);
+    return done&&(scores[rt.k]||0)<=1;
+  }).length;
+  const moderateCount=riskTests.filter(rt=>{
+    if(skippedSrt&&rt.k==="srt")return false;
+    const done=rt.k==="balance"?(S.balR||S.balL):S[rt.k]||(rt.k==="srt"&&srtTotal()>0);
+    return done&&(scores[rt.k]||0)===2;
+  }).length;
+
+  const summaryColor=criticalCount>0?"#d45a5a":moderateCount>0?"#e8a05a":"#5ab87a";
+  const summaryText=criticalCount>0?`${criticalCount} parámetro${criticalCount>1?"s":""} de riesgo elevado`:moderateCount>0?`${moderateCount} parámetro${moderateCount>1?"s":""} de riesgo moderado`:"Sin parámetros de riesgo elevado";
+  const summaryDiv=d({marginTop:"12px",background:summaryColor+"15",border:`1px solid ${summaryColor}30`,borderRadius:"8px",padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"});
+  summaryDiv.appendChild(d({fontSize:"11px",color:summaryColor,fontWeight:"600"},[summaryText]));
+  summaryDiv.appendChild(d({fontSize:"9px",color:t_.textDim},["Basado en 4 tests con evidencia clínica directa"]));
+  riskDiv.appendChild(summaryDiv);
+  inner.appendChild(riskDiv);
+
   // PDF Button
   inner.appendChild(btn({width:"100%",background:t_.accentBg,border:`1px solid ${t_.accentBorder}`,borderRadius:"12px",padding:"13px",color:t_.accent,fontSize:"13px",marginBottom:"10px"},"📄 Guardar PDF / Compartir",()=>generatePDF(scores,keys,date,band)));
 
