@@ -139,28 +139,29 @@ function scPush(v,ab,g,variant){
 function scBal(v,ab,g,ec){if(!v)return 0;const fv=parseFloat(v);if(ec){const tbl=g==="m"?TABLES.balance_oc_m:TABLES.balance_oc_f;const t=tbl[ab];if(!t)return scBal(v,ab,g,false);return sc(fv,t);}const t=TABLES.balance_oa[ab];return t?sc(fv,t):0;}
 function scSRT(v,ab){const t=TABLES.srt[ab];return t&&v?sc(parseFloat(v),t):0;}
 function calcVO2max(metros, variant, fc, peso, edad, genero){
-  if(variant==="run"){
-    // Cooper 12 min formula
-    return (parseFloat(metros) - 504.9) / 44.73;
-  } else {
-    // 6 min walk
-    if(fc && peso && parseFloat(fc)>0 && parseFloat(peso)>0){
-      // Rockport formula (peso en kg → lbs)
-      const pesoLbs = parseFloat(peso) * 2.205;
-      const sexo = genero==="m" ? 1 : 0;
-      return 132.853 - (0.0769*pesoLbs) - (0.3877*parseFloat(edad)) + (6.315*sexo) - (3.2649*6) - (0.1565*parseFloat(fc));
+  try {
+    if(!metros||isNaN(parseFloat(metros)))return NaN;
+    if(variant==="run"){
+      return (parseFloat(metros) - 504.9) / 44.73;
     } else {
-      // Approximation without FC
-      return (parseFloat(metros) * 0.1 + 3.5) * 1.1 / 3.5;
+      if(fc && peso && parseFloat(fc)>0 && parseFloat(peso)>0 && edad && parseFloat(edad)>0){
+        const pesoLbs = parseFloat(peso) * 2.205;
+        const sexo = genero==="m" ? 1 : 0;
+        return 132.853 - (0.0769*pesoLbs) - (0.3877*parseFloat(edad)) + (6.315*sexo) - (3.2649*6) - (0.1565*parseFloat(fc));
+      } else {
+        return (parseFloat(metros) * 0.1 + 3.5) * 1.1 / 3.5;
+      }
     }
-  }
+  } catch(e){ return NaN; }
 }
 function scCoop(v,ab,act,g,variant,fc,peso,edad){
-  if(!v)return 0;
-  const vo2=calcVO2max(v,variant,fc,peso,edad,g);
-  if(isNaN(vo2)||vo2<=0)return 0;
-  const t=TABLES.vo2max[ab]?.[g];
-  return t?sc(vo2,t):0;
+  if(!v||!ab||!g)return 0;
+  try{
+    const vo2=calcVO2max(v,variant,fc,peso,edad,g);
+    if(isNaN(vo2)||vo2<=0)return 0;
+    const t=TABLES.vo2max[ab]?.[g];
+    return t?sc(vo2,t):0;
+  }catch(e){return 0;}
 }
 function getVO2maxDisplay(v,variant,fc,peso,edad,g){
   if(!v)return null;
@@ -245,7 +246,12 @@ function getScores(){
     pushups:S.pushups&&pv?scPush(S.pushups,ab,g,pv):0,
     balance:balScore,
     srt:S.skippedSrt?0:(srtVal>0?scSRT(String(srtVal),ab):0),
-    cooper:S.cooper&&cv&&(cv==="run"||(cv==="walk"&&S.cooperHasFC!==""))?scCoop(S.cooper,ab,act,g,cv,S.cooperHasFC==="yes"?S.cooperFC:"",S.cooperHasFC==="yes"?S.cooperPeso:"",S.age):0,
+    cooper:(()=>{
+      if(!S.cooper||!cv)return 0;
+      if(cv==="walk"&&S.cooperHasFC==="")return 0; // wait for FC choice
+      const useFC=S.cooperHasFC==="yes";
+      return scCoop(S.cooper,ab,act,g,cv,useFC?S.cooperFC:"",useFC?S.cooperPeso:"",S.age);
+    })(),
     deadhang:S.deadhang?scHang(S.deadhang,ab,g):0,
   };
 }
@@ -622,6 +628,7 @@ function testsScreen(){
       cv,v=>{S.cooperVariant=v;render();}));
   }
 
+  // Cooper
   // ── SRT SKIP WARNING — disponible para TODOS los perfiles ──
   if(at==="srt"){
     const highRisk=ab==="over75"||(ab==="66_75"&&act==="sedentary");
@@ -858,7 +865,10 @@ function updateBalDisplay(t_){
 // Cooper Input — with VO2max conversion
 function cooperInput(t_,pres,scores,cv){
   const{ageBand:ab,activity:act,gender:g,age,cooperFC:fc,cooperPeso:peso,cooperHasFC:hasFC}=S;
-  const vo2=S.cooper?getVO2maxDisplay(S.cooper,cv,fc,peso,age,g):null;
+  // Safety: only calculate if we have minimum required data
+  const canCalc=S.cooper&&ab&&g&&age;
+  const useFC=hasFC==="yes"&&fc&&peso;
+  const vo2=canCalc?getVO2maxDisplay(S.cooper,cv,useFC?fc:"",useFC?peso:"",age,g):null;
   const coopScore=scores.cooper||0;
   const lbl2=coopScore?getLabel(coopScore):null;
 
