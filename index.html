@@ -83,10 +83,29 @@ const HEALTH={
   deadhang:{icon:"💪",text:"Indicador de salud del hombro, densidad ósea y resistencia de agarre.",src:"Referencia orientativa — Attia 2023"},
 };
 const TABLES={
-  grip:{u35:{m:[34,40,48,56],f:[21,25,30,36]},"36_50":{m:[33,39,46,53],f:[20,24,29,35]},"51_65":{m:[28,34,41,48],f:[17,21,26,31]},"66_75":{m:[22,28,35,42],f:[13,17,22,27]},over75:{m:[16,22,28,35],f:[9,13,18,23]}},
-  chair:{u35:{m:[17,20,25,30],f:[15,18,22,27]},"36_50":{m:[15,18,22,27],f:[13,16,20,25]},"51_65":{m:[13,16,20,24],f:[11,13,17,21]},"66_75":{m:[10,12,15,18],f:[9,11,13,16]},over75:{m:[8,10,12,15],f:[7,9,11,13]}},
+  // Dinamometría — Metaanálisis 2024 n=2.405.863 + Dodds 2016 n=54.000
+  // [P10, P25, P50, P75]
+  grip:{
+    u35:    {m:[34,40,48,56],f:[20,24,29,35]},
+    "36_50":{m:[33,39,46,53],f:[19,23,28,34]},
+    "51_65":{m:[28,34,41,48],f:[16,20,26,31]},  // P75 M corregido a 31
+    "66_75":{m:[22,28,35,42],f:[12,16,21,27]},
+    over75: {m:[16,22,28,35],f:[8,12,17,22]},
+  },
+  // Chair Stand — Rikli & Jones 1999/2013 directo para >60. Extrapolación para <60.
+  // [P10, P25, P50, P75] — límites entre puntuaciones 1/2/3/4/5
+  chair:{
+    u35:    {m:[14,17,22,28],f:[12,15,20,26]},  // EXTRAPOLACIÓN
+    "36_50":{m:[13,16,21,26],f:[11,14,18,24]},  // EXTRAPOLACIÓN
+    "51_65":{m:[11,13,17,21],f:[10,12,15,19]},  // EXTRAPOLACIÓN PARCIAL
+    "66_75":{m:[10,12,15,18],f:[9,11,13,16]},   // Rikli & Jones directo
+    over75: {m:[8,10,12,15], f:[7,9,11,13]},    // Rikli & Jones directo
+  },
   pushups:{u35:{m:[14,18,28,40],f:[9,12,20,30]},"36_50":{m:[10,14,22,34],f:[6,9,14,22]},"51_65":{m:[7,10,17,26],f:[4,6,10,17]},"66_75":{m:[4,6,12,19],f:[2,4,7,13]},over75:{m:[2,4,8,14],f:[1,2,5,9]}},
   pushups_knees:{u35:{m:[8,12,18,26],f:[10,15,22,32]},"36_50":{m:[6,9,14,20],f:[8,12,17,25]},"51_65":{m:[4,7,11,16],f:[6,9,13,19]},"66_75":{m:[2,4,7,12],f:[4,6,10,15]},over75:{m:[1,3,5,9],f:[2,4,7,11]}},
+  // Flexiones inclinado (banco/escalón ~45cm) — ORIENTATIVO, sin estudio poblacional
+  // Valores aprox. 20-30% superiores a rodillas por menor carga relativa
+  pushups_incline:{u35:{m:[10,15,22,30],f:[12,18,26,35]},"36_50":{m:[8,12,17,24],f:[10,14,20,28]},"51_65":{m:[5,9,14,20],f:[7,11,16,22]},"66_75":{m:[3,6,10,15],f:[5,8,13,18]},over75:{m:[2,4,7,12],f:[3,5,9,13]}},
   balance_oa:{u35:[18,25,38,52],"36_50":[14,20,30,44],"51_65":[10,15,24,36],"66_75":[6,10,16,24],over75:[3,6,11,18]},
   balance_oc_m:{u35:[10,15,22,32],"36_50":[7,11,18,26],"51_65":[4,7,13,20],"66_75":null,over75:null},
   balance_oc_f:{u35:[7,11,17,26],"36_50":[5,8,14,22],"51_65":[3,5,10,16],"66_75":null,over75:null},
@@ -113,7 +132,10 @@ const TEST_LABELS={grip:"Dinamómetro",chair:"Chair Stand",pushups:"Flexiones",b
 function sc(v,t){if(v<t[0])return 1;if(v<t[1])return 2;if(v<t[2])return 3;if(v<t[3])return 4;return 5;}
 function scGrip(v,ab,g){const t=TABLES.grip[ab]?.[g];return t?sc(parseFloat(v),t):0;}
 function scChair(v,ab,g){const t=TABLES.chair[ab]?.[g];return t?sc(parseFloat(v),t):0;}
-function scPush(v,ab,g,variant){const tbl=variant==="knees"?TABLES.pushups_knees:TABLES.pushups;const t=tbl[ab]?.[g];return t?sc(parseFloat(v),t):0;}
+function scPush(v,ab,g,variant){
+  const tbl=variant==="knees"?TABLES.pushups_knees:variant==="incline"?TABLES.pushups_incline:TABLES.pushups;
+  const t=tbl[ab]?.[g];return t?sc(parseFloat(v),t):0;
+}
 function scBal(v,ab,g,ec){if(!v)return 0;const fv=parseFloat(v);if(ec){const tbl=g==="m"?TABLES.balance_oc_m:TABLES.balance_oc_f;const t=tbl[ab];if(!t)return scBal(v,ab,g,false);return sc(fv,t);}const t=TABLES.balance_oa[ab];return t?sc(fv,t):0;}
 function scSRT(v,ab){const t=TABLES.srt[ab];return t&&v?sc(parseFloat(v),t):0;}
 function scCoop(v,ab,act,g,variant){if(!v)return 0;const fv=parseFloat(v);if(variant==="walk"){const t=TABLES.cooper6[ab]?.[g];return t?sc(fv,t):0;}const t=TABLES.cooper12[ab]?.[g];return t?sc(fv,t):0;}
@@ -167,7 +189,13 @@ const S={
 function activeKeys(){
   if(!S.ageBand||!S.activity)return BASE_KEYS;
   const dhOk=S.ageBand!=="over75"&&!(S.ageBand==="66_75"&&S.activity==="sedentary");
-  return S.hangEnabled&&dhOk?[...BASE_KEYS,"deadhang"]:BASE_KEYS;
+  if(S.hangEnabled&&dhOk){
+    // Insert deadhang before cooper (last position)
+    const keys=[...BASE_KEYS];
+    keys.splice(keys.length-1,0,"deadhang");
+    return keys;
+  }
+  return BASE_KEYS;
 }
 function srtTotal(){
   const d=S.srtDown,u=S.srtUp;
@@ -430,7 +458,8 @@ function testsScreen(){
   const{ageBand:ab,activity:act,gender:g,activeTest:at,skippedSrt}=S;
   // Auto-suggest variants if not set
   if(!S.pushupsVariant){
-    if(ab==="over75"||(ab==="66_75")||(ab==="51_65"&&act==="sedentary"))S.pushupsVariant="knees";
+    if(ab==="over75")S.pushupsVariant="incline";
+    else if(ab==="66_75"||(ab==="51_65"&&act==="sedentary"))S.pushupsVariant="knees";
     else S.pushupsVariant="full";
   }
   if(!S.balanceVariant){
@@ -513,7 +542,7 @@ function testsScreen(){
 
   // Variant label
   let variantLabel="";
-  if(at==="pushups"&&pv)variantLabel=pv==="knees"?"🦵 Desde rodillas":"💪 Plancha completa";
+  if(at==="pushups"&&pv)variantLabel=pv==="knees"?"🦵 Desde rodillas":pv==="incline"?"📐 Inclinado (banco/escalón)":"💪 Plancha completa";
   if(at==="balance"&&bv)variantLabel=bv==="closed"?"👁 Ojos cerrados":"👁 Ojos abiertos";
   if(at==="cooper"&&cv)variantLabel=cv==="walk"?"🚶 Caminando (6 min)":"🏃 Corriendo (12 min)";
   if(at==="deadhang"){const dhi=getDhInfo();if(dhi.ok)variantLabel=`Agarre: ${dhi.grip}`;}
@@ -544,7 +573,8 @@ function testsScreen(){
   if(at==="pushups"){
     inner.appendChild(variantSelector(t_,"¿Variante de flexiones?",
       [{k:"full",icon:"💪",title:"Plancha completa",desc:"Cuerpo recto de cabeza a talones",color:"#d45a5a"},
-       {k:"knees",icon:"🦵",title:"Desde rodillas",desc:"Alineado de rodillas a hombros",color:"#8ab4d4"}],
+       {k:"knees",icon:"🦵",title:"Desde rodillas",desc:"Alineado de rodillas a hombros",color:"#8ab4d4"},
+       {k:"incline",icon:"📐",title:"Inclinado (banco/escalón)",desc:"Manos elevadas ~45cm. Para sobrepeso o limitación articular. Baremos orientativos.",color:"#c8a45a"}],
       pv,v=>{S.pushupsVariant=v;render();}));
   }
 
@@ -564,24 +594,27 @@ function testsScreen(){
       cv,v=>{S.cooperVariant=v;render();}));
   }
 
-  // ── SRT SKIP WARNING ──
+  // ── SRT SKIP WARNING — disponible para TODOS los perfiles ──
   if(at==="srt"){
     const highRisk=ab==="over75"||(ab==="66_75"&&act==="sedentary");
     const moderate=ab==="66_75"&&act==="active";
-    if(highRisk||moderate){
-      const warn=d({background:"#e8a05a15",border:"1px solid #e8a05a40",borderRadius:"12px",padding:"12px 14px",marginBottom:"12px"});
-      warn.appendChild(d({fontSize:"10px",color:"#e8a05a",marginBottom:"8px"},[highRisk?"⚠ Perfil de riesgo elevado para bajar al suelo.":"⚠ Realizar con colchoneta y asistente cerca."]));
-      if(!skippedSrt){
-        warn.appendChild(btn({background:"transparent",border:"1px solid #e8a05a",borderRadius:"8px",padding:"6px 12px",color:"#e8a05a",fontSize:"10px"},
-          "Marcar como no realizable",()=>{S.skippedSrt=true;render();}));
-      } else {
-        const uRow=d({display:"flex",alignItems:"center",gap:"10px"});
-        uRow.appendChild(d({fontSize:"10px",color:"#e8a05a"},["✓ Limitación funcional registrada"]));
-        uRow.appendChild(btn({background:"transparent",border:`1px solid ${t_.border}`,borderRadius:"8px",padding:"4px 8px",color:t_.textDim,fontSize:"9px"},"Deshacer",()=>{S.skippedSrt=false;render();}));
-        warn.appendChild(uRow);
-      }
-      inner.appendChild(warn);
+    const warn=d({background:"#e8a05a15",border:"1px solid #e8a05a40",borderRadius:"12px",padding:"12px 14px",marginBottom:"12px"});
+    // Message adapts to profile
+    let warnMsg="";
+    if(highRisk)warnMsg="⚠ Perfil de riesgo elevado para bajar al suelo.";
+    else if(moderate)warnMsg="⚠ Realizar con colchoneta y asistente cerca.";
+    else warnMsg="Si el cliente tiene sobrepeso, dolor articular o limitación médica, puede marcarse como no realizable.";
+    warn.appendChild(d({fontSize:"10px",color:"#e8a05a",marginBottom:"8px"},[warnMsg]));
+    if(!skippedSrt){
+      warn.appendChild(btn({background:"transparent",border:"1px solid #e8a05a",borderRadius:"8px",padding:"6px 12px",color:"#e8a05a",fontSize:"10px"},
+        "Marcar como no realizable → registrar limitación funcional",()=>{S.skippedSrt=true;render();}));
+    } else {
+      const uRow=d({display:"flex",alignItems:"center",gap:"10px"});
+      uRow.appendChild(d({fontSize:"10px",color:"#e8a05a"},["✓ Limitación funcional registrada"]));
+      uRow.appendChild(btn({background:"transparent",border:`1px solid ${t_.border}`,borderRadius:"8px",padding:"4px 8px",color:t_.textDim,fontSize:"9px"},"Deshacer",()=>{S.skippedSrt=false;render();}));
+      warn.appendChild(uRow);
     }
+    inner.appendChild(warn);
   }
 
   // ── PROTOCOL ──
@@ -605,7 +638,7 @@ function testsScreen(){
     let note="";
     if(at==="grip")note="Mano dominante. 3 intentos, mejor marca. Brazo extendido. Apretar al máximo 3–5 seg.";
     else if(at==="chair")note="Levantarse y sentarse completamente en 30 segundos. Sin apoyo de manos.";
-    else if(at==="pushups")note=pv==="knees"?"Rodillas en suelo, cuerpo alineado. Pecho roza suelo. Hasta el fallo técnico.":pv==="full"?"Plancha completa. Cuerpo recto. Pecho toca suelo. Hasta el fallo técnico.":"Selecciona la variante arriba.";
+    else if(at==="pushups")note=pv==="knees"?"Rodillas en suelo, cuerpo alineado. Pecho roza suelo. Hasta el fallo técnico.":pv==="full"?"Plancha completa. Cuerpo recto. Pecho toca suelo. Hasta el fallo técnico.":pv==="incline"?"Manos en banco o escalón (~45cm). Cuerpo recto. Bajar hasta que el pecho roza el borde. Hasta el fallo técnico. ℹ Baremos orientativos — sin estudio poblacional.":"Selecciona la variante arriba.";
     else if(at==="balance")note=bv==="closed"?"OJOS CERRADOS. Registrar AMBAS piernas por separado. Puntúa la peor.":bv==="open"?"OJOS ABIERTOS, punto fijo. AMBAS piernas por separado. Puntúa la peor.":"Selecciona la variante arriba.";
     else if(at==="srt")note="PIERNAS CRUZADAS obligatorio. Sentarse y levantarse sin apoyos. −1 por apoyo, −0.5 por pérdida de equilibrio.";
     else if(at==="cooper")note=cv==="run"?"Correr / trotar durante 12 minutos. Medir metros totales.":cv==="walk"?"Caminar rápido durante 6 minutos. Medir metros totales.":"Selecciona la variante arriba.";
@@ -894,6 +927,8 @@ function resultsScreen(){
     if(deficits.length===0&&pct>=55)tx+="No se detectan déficits críticos. Mantener y progresar.";
     return tx;
   }
+  // Make diagText available globally for PDF
+  window._diagText=diagText;
 
   const wrap=d({});
   const inner=e("div",{cls:"main-inner",style:{maxWidth:"860px",margin:"0 auto",padding:"36px 24px"}});
@@ -937,7 +972,7 @@ function resultsScreen(){
   if(rel==="low")diagHead.appendChild(d({fontSize:"9px",color:"#d45a5a"},["⚠ No fiable con <4 tests"]));
   diagDiv.appendChild(diagHead);
   const diagP=e("p",{style:{fontFamily:"'Playfair Display',Georgia,serif",fontSize:"13px",color:rel==="low"?t_.textDim:t_.text,lineHeight:"1.7",fontStyle:"italic"}});
-  diagP.textContent=`"${diagText()}"`;
+  diagP.textContent=`"${typeof window._diagText==='function'?window._diagText():''}"`;
   diagDiv.appendChild(diagP);
   inner.appendChild(diagDiv);
 
@@ -973,7 +1008,7 @@ function resultsScreen(){
     const nameEl=d({fontSize:"10px",color:t_.textDim,marginBottom:"2px"});
     let nameT=TEST_LABELS[k].toUpperCase();
     if(isH)nameT+=" ★";
-    if(k==="pushups"&&pv)nameT+=` · ${pv==="knees"?"rodillas":"plancha"}`;
+    if(k==="pushups"&&pv)nameT+=` · ${pv==="knees"?"rodillas":pv==="incline"?"inclinado":"plancha"}`;
     if(k==="balance"&&bv)nameT+=` · ${bv==="closed"?"OC":"OA"}`;
     if(k==="cooper"&&cv)nameT+=` · ${cv==="walk"?"6min":"12min"}`;
     nameEl.textContent=nameT;
@@ -1136,7 +1171,7 @@ function generatePDF(scores,keys,date,band){
     else if(k==="srt")val=`${srtTotal().toFixed(1)} puntos`;
     else if(k==="grip")val=`${S.grip} kg`;
     else if(k==="chair")val=`${S.chair} rep`;
-    else if(k==="pushups")val=`${S.pushups} rep (${pv==="knees"?"rodillas":"plancha"})`;
+    else if(k==="pushups")val=`${S.pushups} rep (${pv==="knees"?"rodillas":pv==="incline"?"inclinado":"plancha"})`;
     else if(k==="cooper")val=`${S.cooper}m (${cv==="walk"?"6min caminando":"12min corriendo"})`;
     else if(k==="deadhang")val=`${S.deadhang}s`;
     const dotsFill="●".repeat(s)+"○".repeat(5-s);
@@ -1149,6 +1184,9 @@ function generatePDF(scores,keys,date,band){
 <div class="header"><div class="brand">EVALUACIÓN FÍSICA FUNCIONAL</div><h1>${S.name||"Cliente"}</h1><div class="meta">${S.age} años · ${band?.desc} (${band?.label}) · ${S.activity==="active"?"Activo":"Sedentario"} · ${S.gender==="m"?"Hombre":"Mujer"} · ${date}</div></div>
 <div class="score-box"><div><div class="score-pct" style="color:${totLbl.color}">${pct}%</div><div class="score-lbl" style="color:${totLbl.color}">${totLbl.text}</div><div class="score-desc">${totLbl.desc}</div></div><div class="score-pts"><div class="num">${total}</div><div class="sub">de ${max} puntos</div><div class="sub" style="margin-top:3px">${rel}</div></div></div>
 ${strong.length>0||deficits.length>0?`<div class="sec">RESUMEN</div>${strong.length>0?`<p style="font-size:11px;color:#6a6050;margin-bottom:5px">✅ Puntos fuertes:</p><div class="pills">${strong.map(s=>`<span class="pill g">${s}</span>`).join("")}</div>`:""}${deficits.length>0?`<p style="font-size:11px;color:#6a6050;margin-bottom:5px;margin-top:6px">⚠️ Prioridades:</p><div class="pills">${deficits.map(d=>`<span class="pill r">${d}</span>`).join("")}</div>`:""}`:""}
+<div class="sec" style="margin-top:16px">DIAGNÓSTICO</div>
+<div style="background:#fff;border-left:4px solid #3dd6a3;border-radius:0 8px 8px 0;padding:14px 16px;margin-bottom:16px;font-family:'Playfair Display',Georgia,serif;font-size:13px;font-style:italic;line-height:1.7;color:#1a1a1a;">"${typeof window._diagText==='function'?window._diagText():''}"</div>
+${S.notas?`<div class="sec">NOTAS DEL ENTRENADOR</div><div style="background:#f5f2ee;border-radius:8px;padding:12px 14px;font-size:12px;color:#4a4038;line-height:1.6;margin-bottom:16px;">${S.notas}</div>`:``}
 <div class="sec" style="margin-top:18px">RESULTADOS POR TEST</div>
 <table><thead><tr><th>TEST</th><th>PUNTUACIÓN</th><th>RESULTADO</th><th>NIVEL</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="footer"><span>Evaluación Física Funcional · longevity-test.vercel.app</span><span>${date}</span></div>
@@ -1182,7 +1220,7 @@ function saveToSheets(scores,keys){
     chair_rep:S.chair||"",
     chair_pts:scores.chair||"",
     pushups_rep:S.pushups||"",
-    pushups_variante:pv==="knees"?"Rodillas":"Plancha completa",
+    pushups_variante:pv==="knees"?"Rodillas":pv==="incline"?"Inclinado (banco/escalón)":"Plancha completa",
     pushups_pts:scores.pushups||"",
     balance_r_seg:S.balR||"",
     balance_l_seg:S.balL||"",
