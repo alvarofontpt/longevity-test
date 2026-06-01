@@ -144,7 +144,7 @@ function calcVO2max(metros, variant, fc, peso, edad, genero){
     return (parseFloat(metros) - 504.9) / 44.73;
   } else {
     // 6 min walk
-    if(fc && peso){
+    if(fc && peso && parseFloat(fc)>0 && parseFloat(peso)>0){
       // Rockport formula (peso en kg → lbs)
       const pesoLbs = parseFloat(peso) * 2.205;
       const sexo = genero==="m" ? 1 : 0;
@@ -245,7 +245,7 @@ function getScores(){
     pushups:S.pushups&&pv?scPush(S.pushups,ab,g,pv):0,
     balance:balScore,
     srt:S.skippedSrt?0:(srtVal>0?scSRT(String(srtVal),ab):0),
-    cooper:S.cooper&&cv?scCoop(S.cooper,ab,act,g,cv,S.cooperFC,S.cooperPeso,S.age):0,
+    cooper:S.cooper&&cv&&(cv==="run"||(cv==="walk"&&S.cooperHasFC!==""))?scCoop(S.cooper,ab,act,g,cv,S.cooperHasFC==="yes"?S.cooperFC:"",S.cooperHasFC==="yes"?S.cooperPeso:"",S.age):0,
     deadhang:S.deadhang?scHang(S.deadhang,ab,g):0,
   };
 }
@@ -879,8 +879,8 @@ function cooperInput(t_,pres,scores,cv){
     const fcQ=d({background:t_.bgInput,borderRadius:"12px",padding:"14px",marginBottom:"12px"});
     fcQ.appendChild(d({fontSize:"9px",letterSpacing:"2px",color:t_.textDim,marginBottom:"10px"},["¿TIENES DATO DE FRECUENCIA CARDÍACA AL FINALIZAR?"]));
     const fcGrid=d({display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"10px"});
-    [{k:true,icon:"💓",title:"Sí",desc:"Pulsómetro o Apple Watch",color:"#5ab87a"},
-     {k:false,icon:"—",title:"No",desc:"Sin dato de FC",color:"#8ab4d4"}].forEach(o=>{
+    [{k:"yes",icon:"💓",title:"Sí",desc:"Pulsómetro o Apple Watch",color:"#5ab87a"},
+     {k:"no",icon:"—",title:"No",desc:"Sin dato de FC",color:"#8ab4d4"}].forEach(o=>{
       const active=hasFC===o.k;
       const c=d({background:active?o.color+"18":t_.bgCard,border:`1px solid ${active?o.color:t_.border}`,borderRadius:"10px",padding:"10px",cursor:"pointer",textAlign:"center",transition:"all 0.15s"});
       c.appendChild(d({fontSize:"20px",marginBottom:"4px"},[o.icon]));
@@ -892,7 +892,7 @@ function cooperInput(t_,pres,scores,cv){
     fcQ.appendChild(fcGrid);
 
     // FC + Peso fields if hasFC
-    if(hasFC===true){
+    if(hasFC==="yes"){
       const fields=d({display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"});
       // FC field
       const fcCol=d({});
@@ -912,7 +912,7 @@ function cooperInput(t_,pres,scores,cv){
       fields.appendChild(pesoCol);
       fcQ.appendChild(fields);
       fcQ.appendChild(d({marginTop:"8px",fontSize:"9px",color:t_.textMuted,padding:"5px 8px",background:t_.bgCard,borderRadius:"6px"},["Fórmula Rockport — VO2max preciso con FC"]));
-    } else if(hasFC===false){
+    } else if(hasFC==="no"){
       fcQ.appendChild(d({fontSize:"9px",color:t_.textMuted,padding:"5px 8px",background:t_.bgCard,borderRadius:"6px"},["ℹ VO2max estimado sin FC — valor orientativo. Resultado menos preciso."]));
     }
     wrap.appendChild(fcQ);
@@ -1133,7 +1133,7 @@ function resultsScreen(){
     else if(k==="pushups")val=`${S.pushups} rep`;
     else if(k==="cooper"){
       const vo2=S.cooper?getVO2maxDisplay(S.cooper,cv,S.cooperFC,S.cooperPeso,S.age,g):null;
-      const fcNote=cv==="walk"?(S.cooperHasFC===true?" · Rockport":S.cooperHasFC===false?" · estimado":""):"";
+      const fcNote=cv==="walk"?(S.cooperHasFC==="yes"?" · Rockport":S.cooperHasFC==="no"?" · estimado":""):"";
       val=`VO2max: ${vo2||"—"} ml/kg/min${fcNote} · ${S.cooper}m`;
     }
     else if(k==="deadhang")val=`${S.deadhang}s`;
@@ -1287,7 +1287,7 @@ function generatePDF(scores,keys,date,band){
     else if(k==="pushups")val=`${S.pushups} rep (${pv==="knees"?"rodillas":pv==="incline"?"inclinado":"plancha"})`;
     else if(k==="cooper"){
       const vo2=S.cooper?getVO2maxDisplay(S.cooper,cv,S.cooperFC,S.cooperPeso,S.age,S.gender):null;
-      const fcNote=cv==="walk"?(S.cooperHasFC===true?" Rockport":S.cooperHasFC===false?" estimado":""):"";
+      const fcNote=cv==="walk"?(S.cooperHasFC==="yes"?" Rockport":S.cooperHasFC==="no"?" estimado":""):"";
       val=`VO2max ${vo2||"—"} ml/kg/min${fcNote} · ${S.cooper}m (${cv==="walk"?"6min":"12min"})`;
     }
     else if(k==="deadhang")val=`${S.deadhang}s`;
